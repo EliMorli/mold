@@ -118,57 +118,57 @@ function PagesContent() {
     
     return (
         <Layout currentPageName={currentPage}>
-            <Routes>            
-                
-                    <Route path="/" element={<Automation />} />
-                
-                
-                <Route path="/Automation" element={<Automation />} />
-                
-                <Route path="/Calendar" element={<Calendar />} />
-                
-                <Route path="/ClientPortal" element={<ClientPortal />} />
-                
-                <Route path="/ClientProfile" element={<ClientProfile />} />
-                
-                <Route path="/Clients" element={<Clients />} />
-                
-                <Route path="/Communications" element={<Communications />} />
-                
-                <Route path="/CustomReports" element={<CustomReports />} />
-                
-                <Route path="/Dashboard" element={<Dashboard />} />
-                
-                <Route path="/Documents" element={<Documents />} />
-                
-                <Route path="/Expenses" element={<Expenses />} />
-                
-                <Route path="/Home" element={<Home />} />
-                
-                <Route path="/Invoices" element={<Invoices />} />
-                
-                <Route path="/Labs" element={<Labs />} />
-                
-                <Route path="/Map" element={<Map />} />
-                
-                <Route path="/OwnerView" element={<OwnerView />} />
-                
-                <Route path="/Payments" element={<Payments />} />
-                
-                <Route path="/Reports" element={<Reports />} />
-                
-                <Route path="/Settings" element={<Settings />} />
-                
-                <Route path="/TechnicianProfile" element={<TechnicianProfile />} />
-                
-                <Route path="/Technicians" element={<Technicians />} />
-                
-                <Route path="/TestProfile" element={<TestProfile />} />
-                
-                <Route path="/Tests" element={<Tests />} />
-                
-                <Route path="/TechnicianPerformance" element={<TechnicianPerformance />} />
-                
+            <Routes>
+
+                    <Route path="/" element={<Dashboard />} />
+
+
+                <Route path="/automation" element={<Automation />} />
+
+                <Route path="/calendar" element={<Calendar />} />
+
+                <Route path="/clientportal" element={<ClientPortal />} />
+
+                <Route path="/clientprofile" element={<ClientProfile />} />
+
+                <Route path="/clients" element={<Clients />} />
+
+                <Route path="/communications" element={<Communications />} />
+
+                <Route path="/customreports" element={<CustomReports />} />
+
+                <Route path="/dashboard" element={<Dashboard />} />
+
+                <Route path="/documents" element={<Documents />} />
+
+                <Route path="/expenses" element={<Expenses />} />
+
+                <Route path="/home" element={<Home />} />
+
+                <Route path="/invoices" element={<Invoices />} />
+
+                <Route path="/labs" element={<Labs />} />
+
+                <Route path="/map" element={<Map />} />
+
+                <Route path="/ownerview" element={<OwnerView />} />
+
+                <Route path="/payments" element={<Payments />} />
+
+                <Route path="/reports" element={<Reports />} />
+
+                <Route path="/settings" element={<Settings />} />
+
+                <Route path="/technicianprofile" element={<TechnicianProfile />} />
+
+                <Route path="/technicians" element={<Technicians />} />
+
+                <Route path="/testprofile" element={<TestProfile />} />
+
+                <Route path="/tests" element={<Tests />} />
+
+                <Route path="/technicianperformance" element={<TechnicianPerformance />} />
+
             </Routes>
         </Layout>
     );
