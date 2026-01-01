@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 2;
+const DEMO_DATA_VERSION = 3;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -132,20 +132,24 @@ const INITIAL_EXPENSES = [
 const checkDemoVersion = () => {
   try {
     const storedVersion = localStorage.getItem('demo_version');
+    console.log('[Demo] Stored version:', storedVersion, 'Current version:', DEMO_DATA_VERSION);
     if (storedVersion !== String(DEMO_DATA_VERSION)) {
+      console.log('[Demo] Version mismatch - clearing all demo data');
       // Clear all demo data to force refresh
       Object.keys(localStorage)
         .filter(k => k.startsWith('demo_'))
         .forEach(k => localStorage.removeItem(k));
       localStorage.setItem('demo_version', String(DEMO_DATA_VERSION));
     }
-  } catch {
-    // Ignore errors
+  } catch (e) {
+    console.error('[Demo] Version check error:', e);
   }
 };
 
 // Run version check on load
-checkDemoVersion();
+if (typeof window !== 'undefined') {
+  checkDemoVersion();
+}
 
 // Helper to get/set data from localStorage with persistence
 const getStoredData = (key, initialData) => {
@@ -155,15 +159,19 @@ const getStoredData = (key, initialData) => {
       const parsed = JSON.parse(stored);
       // If stored data is empty but we have initial data, use initial data
       if (Array.isArray(parsed) && parsed.length === 0 && initialData.length > 0) {
+        console.log(`[Demo] ${key}: stored empty, using ${initialData.length} initial items`);
         localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
         return initialData;
       }
+      console.log(`[Demo] ${key}: returning ${parsed.length} stored items`);
       return parsed;
     }
     // Initialize with default data
+    console.log(`[Demo] ${key}: no stored data, initializing with ${initialData.length} items`);
     localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
     return initialData;
-  } catch {
+  } catch (e) {
+    console.error(`[Demo] ${key} error:`, e);
     return initialData;
   }
 };
