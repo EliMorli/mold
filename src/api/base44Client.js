@@ -4,6 +4,9 @@ import { createClient } from '@base44/sdk';
 // Demo mode - set to true to bypass Base44 authentication
 export const DEMO_MODE = true;
 
+// Version for demo data - increment this to force refresh localStorage
+const DEMO_DATA_VERSION = 2;
+
 // Helper to create dates relative to today
 const daysAgo = (days) => {
   const date = new Date();
@@ -124,6 +127,25 @@ const INITIAL_EXPENSES = [
   { id: '17', description: 'Software subscription - CRM', category: 'Other', amount: 99, date: daysAgo(5), vendor: 'Base44', notes: 'Monthly subscription' },
   { id: '18', description: 'Insurance premium', category: 'Other', amount: 850, date: daysAgo(30), vendor: 'State Farm', notes: 'General liability' },
 ];
+
+// Check and update demo data version - clears old data if version changed
+const checkDemoVersion = () => {
+  try {
+    const storedVersion = localStorage.getItem('demo_version');
+    if (storedVersion !== String(DEMO_DATA_VERSION)) {
+      // Clear all demo data to force refresh
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('demo_'))
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('demo_version', String(DEMO_DATA_VERSION));
+    }
+  } catch {
+    // Ignore errors
+  }
+};
+
+// Run version check on load
+checkDemoVersion();
 
 // Helper to get/set data from localStorage with persistence
 const getStoredData = (key, initialData) => {
