@@ -130,7 +130,13 @@ const getStoredData = (key, initialData) => {
   try {
     const stored = localStorage.getItem(`demo_${key}`);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // If stored data is empty but we have initial data, use initial data
+      if (Array.isArray(parsed) && parsed.length === 0 && initialData.length > 0) {
+        localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
+        return initialData;
+      }
+      return parsed;
     }
     // Initialize with default data
     localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
