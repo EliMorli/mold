@@ -22,6 +22,24 @@ export default function TestsPage() {
     initialData: [],
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => base44.entities.Client.list(),
+    initialData: [],
+  });
+
+  const { data: technicians = [] } = useQuery({
+    queryKey: ['technicians'],
+    queryFn: () => base44.entities.Technician.list(),
+    initialData: [],
+  });
+
+  const { data: labs = [] } = useQuery({
+    queryKey: ['labs'],
+    queryFn: () => base44.entities.Lab.list(),
+    initialData: [],
+  });
+
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Test.create(data),
     onSuccess: () => {
@@ -189,6 +207,9 @@ export default function TestsPage() {
       {showModal && (
         <TestModal
           test={selectedTest}
+          clients={clients}
+          technicians={technicians}
+          labs={labs}
           onClose={() => {
             setShowModal(false);
             setSelectedTest(null);
