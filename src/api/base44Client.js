@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 2;
+const DEMO_DATA_VERSION = 4;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -132,20 +132,24 @@ const INITIAL_EXPENSES = [
 const checkDemoVersion = () => {
   try {
     const storedVersion = localStorage.getItem('demo_version');
+    console.log('[Demo] Stored version:', storedVersion, 'Current version:', DEMO_DATA_VERSION);
     if (storedVersion !== String(DEMO_DATA_VERSION)) {
+      console.log('[Demo] Version mismatch - clearing all demo data');
       // Clear all demo data to force refresh
       Object.keys(localStorage)
         .filter(k => k.startsWith('demo_'))
         .forEach(k => localStorage.removeItem(k));
       localStorage.setItem('demo_version', String(DEMO_DATA_VERSION));
     }
-  } catch {
-    // Ignore errors
+  } catch (e) {
+    console.error('[Demo] Version check error:', e);
   }
 };
 
 // Run version check on load
-checkDemoVersion();
+if (typeof window !== 'undefined') {
+  checkDemoVersion();
+}
 
 // Helper to get/set data from localStorage with persistence
 const getStoredData = (key, initialData) => {
@@ -155,15 +159,19 @@ const getStoredData = (key, initialData) => {
       const parsed = JSON.parse(stored);
       // If stored data is empty but we have initial data, use initial data
       if (Array.isArray(parsed) && parsed.length === 0 && initialData.length > 0) {
+        console.log(`[Demo] ${key}: stored empty, using ${initialData.length} initial items`);
         localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
         return initialData;
       }
+      console.log(`[Demo] ${key}: returning ${parsed.length} stored items`);
       return parsed;
     }
     // Initialize with default data
+    console.log(`[Demo] ${key}: no stored data, initializing with ${initialData.length} items`);
     localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
     return initialData;
-  } catch {
+  } catch (e) {
+    console.error(`[Demo] ${key} error:`, e);
     return initialData;
   }
 };
@@ -176,26 +184,42 @@ const saveData = (key, data) => {
   }
 };
 
+// Map of all initial data by key
+const INITIAL_DATA_MAP = {
+  tests: INITIAL_TESTS,
+  clients: INITIAL_CLIENTS,
+  technicians: INITIAL_TECHNICIANS,
+  labs: INITIAL_LABS,
+  invoices: INITIAL_INVOICES,
+  expenses: INITIAL_EXPENSES,
+  payments: [],
+  documents: [],
+  messages: [],
+  settings: [],
+};
+
 // Create mock entity wrapper with localStorage persistence
-const createMockEntity = (key, initialData) => {
+const createMockEntity = (key) => {
+  const getInitialData = () => INITIAL_DATA_MAP[key] || [];
+
   return {
     list: () => {
-      const data = getStoredData(key, initialData);
+      const data = getStoredData(key, getInitialData());
       return Promise.resolve([...data]);
     },
     get: (id) => {
-      const data = getStoredData(key, initialData);
+      const data = getStoredData(key, getInitialData());
       return Promise.resolve(data.find(item => item.id === id));
     },
     create: (newItem) => {
-      const data = getStoredData(key, initialData);
+      const data = getStoredData(key, getInitialData());
       const item = { id: Date.now().toString(), created_date: new Date().toISOString(), ...newItem };
       data.push(item);
       saveData(key, data);
       return Promise.resolve(item);
     },
     update: (id, updates) => {
-      const data = getStoredData(key, initialData);
+      const data = getStoredData(key, getInitialData());
       const index = data.findIndex(item => item.id === id);
       if (index !== -1) {
         data[index] = { ...data[index], ...updates, updated_date: new Date().toISOString() };
@@ -205,7 +229,7 @@ const createMockEntity = (key, initialData) => {
       return Promise.resolve(null);
     },
     delete: (id) => {
-      const data = getStoredData(key, initialData);
+      const data = getStoredData(key, getInitialData());
       const filtered = data.filter(item => item.id !== id);
       saveData(key, filtered);
       return Promise.resolve({ success: true });
@@ -222,16 +246,16 @@ const realClient = createClient({
 // Mock client for demo mode with localStorage persistence
 const mockClient = {
   entities: {
-    Test: createMockEntity('tests', INITIAL_TESTS),
-    Client: createMockEntity('clients', INITIAL_CLIENTS),
-    Technician: createMockEntity('technicians', INITIAL_TECHNICIANS),
-    Lab: createMockEntity('labs', INITIAL_LABS),
-    Invoice: createMockEntity('invoices', INITIAL_INVOICES),
-    Expense: createMockEntity('expenses', INITIAL_EXPENSES),
-    Payment: createMockEntity('payments', []),
-    Document: createMockEntity('documents', []),
-    Message: createMockEntity('messages', []),
-    AppSettings: createMockEntity('settings', []),
+    Test: createMockEntity('tests'),
+    Client: createMockEntity('clients'),
+    Technician: createMockEntity('technicians'),
+    Lab: createMockEntity('labs'),
+    Invoice: createMockEntity('invoices'),
+    Expense: createMockEntity('expenses'),
+    Payment: createMockEntity('payments'),
+    Document: createMockEntity('documents'),
+    Message: createMockEntity('messages'),
+    AppSettings: createMockEntity('settings'),
   },
   auth: {
     me: () => Promise.resolve({ id: 'demo', full_name: 'Demo Admin', email: 'demo@example.com', app_role: 'Admin' }),
