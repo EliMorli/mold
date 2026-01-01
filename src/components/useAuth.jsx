@@ -1,10 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { base44, DEMO_MODE } from "@/api/base44Client";
+
+// Mock user for demo mode
+const DEMO_USER = {
+  id: 'demo-user',
+  full_name: 'Demo Admin',
+  email: 'demo@example.com',
+  app_role: 'Admin',
+};
 
 export function useAuth() {
   const { data: user, isLoading } = useQuery({
     queryKey: ['currentUser'],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => DEMO_MODE ? Promise.resolve(DEMO_USER) : base44.auth.me(),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
