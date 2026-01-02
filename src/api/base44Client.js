@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 4;
+const DEMO_DATA_VERSION = 5;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -149,6 +149,28 @@ const checkDemoVersion = () => {
 // Run version check on load
 if (typeof window !== 'undefined') {
   checkDemoVersion();
+
+  // Force initialize ALL demo data immediately to avoid timing issues
+  const initializeAllDemoData = () => {
+    const dataToInit = {
+      technicians: INITIAL_TECHNICIANS,
+      labs: INITIAL_LABS,
+      tests: INITIAL_TESTS,
+      clients: INITIAL_CLIENTS,
+      invoices: INITIAL_INVOICES,
+      expenses: INITIAL_EXPENSES,
+    };
+
+    Object.entries(dataToInit).forEach(([key, initialData]) => {
+      const stored = localStorage.getItem(`demo_${key}`);
+      if (!stored || stored === '[]') {
+        console.log(`[Demo] Force initializing ${key} with ${initialData.length} items`);
+        localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
+      }
+    });
+  };
+
+  initializeAllDemoData();
 }
 
 // Helper to get/set data from localStorage with persistence
