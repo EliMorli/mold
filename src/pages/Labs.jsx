@@ -17,7 +17,7 @@ export default function LabsPage() {
   const { data: labs = [], isLoading } = useQuery({
     queryKey: ['labs'],
     queryFn: () => base44.entities.Lab.list('-created_date'),
-    initialData: [],
+    staleTime: 0, // Always refetch
   });
 
   const createMutation = useMutation({
