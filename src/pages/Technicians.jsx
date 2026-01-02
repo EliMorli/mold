@@ -19,7 +19,7 @@ export default function TechniciansPage() {
   const { data: technicians = [], isLoading } = useQuery({
     queryKey: ['technicians'],
     queryFn: () => base44.entities.Technician.list('-created_date'),
-    initialData: [],
+    staleTime: 0, // Always refetch
   });
 
   const createMutation = useMutation({
