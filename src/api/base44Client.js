@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 6;
+const DEMO_DATA_VERSION = 7;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -246,11 +246,18 @@ const INITIAL_DATA_MAP = {
 
 // Create mock entity wrapper with localStorage persistence
 const createMockEntity = (key) => {
-  const getInitialData = () => INITIAL_DATA_MAP[key] || [];
+  const getInitialData = () => {
+    const data = INITIAL_DATA_MAP[key];
+    console.log(`[Demo] getInitialData(${key}): found ${data ? data.length : 0} items`);
+    return data || [];
+  };
 
   return {
     list: () => {
-      const data = getStoredData(key, getInitialData());
+      console.log(`[Demo] list() called for ${key}`);
+      const initial = getInitialData();
+      const data = getStoredData(key, initial);
+      console.log(`[Demo] list(${key}): returning ${data.length} items`);
       return Promise.resolve([...data]);
     },
     get: (id) => {
