@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 5;
+const DEMO_DATA_VERSION = 6;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -162,10 +162,34 @@ if (typeof window !== 'undefined') {
     };
 
     Object.entries(dataToInit).forEach(([key, initialData]) => {
-      const stored = localStorage.getItem(`demo_${key}`);
-      if (!stored || stored === '[]') {
-        console.log(`[Demo] Force initializing ${key} with ${initialData.length} items`);
-        localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
+      try {
+        const stored = localStorage.getItem(`demo_${key}`);
+        let needsInit = false;
+
+        if (!stored) {
+          needsInit = true;
+          console.log(`[Demo] ${key}: no stored value, will initialize`);
+        } else {
+          try {
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed) || parsed.length === 0) {
+              needsInit = true;
+              console.log(`[Demo] ${key}: stored value empty or invalid, will initialize`);
+            } else {
+              console.log(`[Demo] ${key}: has ${parsed.length} items`);
+            }
+          } catch (parseErr) {
+            needsInit = true;
+            console.log(`[Demo] ${key}: parse error, will initialize`);
+          }
+        }
+
+        if (needsInit && initialData.length > 0) {
+          console.log(`[Demo] Force initializing ${key} with ${initialData.length} items`);
+          localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
+        }
+      } catch (e) {
+        console.error(`[Demo] Error initializing ${key}:`, e);
       }
     });
   };
