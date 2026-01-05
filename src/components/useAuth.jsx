@@ -1,77 +1,86 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44, DEMO_MODE } from "@/api/base44Client";
-
-// Mock user for demo mode
-const DEMO_USER = {
-  id: 'demo-user',
-  full_name: 'Demo Admin',
-  email: 'demo@example.com',
-  app_role: 'Admin',
-};
+import { base44 } from "@/api/base44Client";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading, refetch } = useQuery({
     queryKey: ['currentUser'],
-    queryFn: () => DEMO_MODE ? Promise.resolve(DEMO_USER) : base44.auth.me(),
+    queryFn: () => base44.auth.me(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false,
   });
 
-  const appRole = user?.app_role || 'View Only';
+  const isLoggedIn = !!user;
+  const appRole = user?.role || 'View Only';
+  const permissions = user?.permissions || {};
+
   const isAdmin = appRole === 'Admin';
   const isTechnician = appRole === 'Technician';
   const isClient = appRole === 'Client';
   const isViewOnly = appRole === 'View Only';
 
+  // Check if user has specific permission for a resource
   const canView = (resource) => {
-    // Everyone can view dashboard
-    if (resource === 'dashboard') return true;
+    // Not logged in - no access
+    if (!user) return false;
 
-    // View Only can only see dashboard and reports
-    if (isViewOnly) return ['dashboard', 'reports'].includes(resource);
+    // Client portal is special - only for clients
+    if (resource === 'client-portal') return isClient;
 
-    // Clients can see client portal, tests, invoices, payments
-    if (isClient) return ['dashboard', 'client-portal', 'tests', 'invoices', 'payments', 'reports'].includes(resource);
+    // Check permissions object
+    if (permissions[resource]?.view) return true;
 
-    // Technicians can see most things except financial settings
-    if (isTechnician) return !['settings', 'expenses', 'owner-view', 'client-portal', 'automation'].includes(resource);
+    // Fallback for backwards compatibility with role-based checks
+    if (isAdmin) return true;
 
-    // Admins can see everything except client portal (that's for clients only)
-    if (resource === 'client-portal') return false;
-
-    return isAdmin;
+    return false;
   };
 
   const canEdit = (resource) => {
-    // View Only and Clients cannot edit
-    if (isViewOnly || isClient) return false;
-    
-    // Technicians can edit tests, calendar, map, their profile
-    if (isTechnician) return ['tests', 'calendar', 'map', 'technicians'].includes(resource);
-    
-    // Admins can edit everything
-    return isAdmin;
+    if (!user) return false;
+
+    // Check permissions object
+    if (permissions[resource]?.edit) return true;
+
+    // Fallback for admin
+    if (isAdmin) return true;
+
+    return false;
   };
 
   const canDelete = (resource) => {
-    // Only admins can delete
-    return isAdmin;
+    if (!user) return false;
+
+    // Check permissions object
+    if (permissions[resource]?.delete) return true;
+
+    // Fallback for admin
+    if (isAdmin) return true;
+
+    return false;
   };
 
   const canCreate = (resource) => {
-    // View Only and Clients cannot create
-    if (isViewOnly || isClient) return false;
-    
-    // Technicians can create tests
-    if (isTechnician) return ['tests'].includes(resource);
-    
-    // Admins can create everything
-    return isAdmin;
+    if (!user) return false;
+
+    // Check permissions object
+    if (permissions[resource]?.create) return true;
+
+    // Fallback for admin
+    if (isAdmin) return true;
+
+    return false;
+  };
+
+  const logout = () => {
+    base44.auth.logout();
   };
 
   return {
     user,
     isLoading,
+    isLoggedIn,
     appRole,
+    permissions,
     isAdmin,
     isTechnician,
     isClient,
@@ -80,5 +89,7 @@ export function useAuth() {
     canEdit,
     canDelete,
     canCreate,
+    logout,
+    refetch,
   };
 }

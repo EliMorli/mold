@@ -51,6 +51,4 @@ export const Payment = DEMO_MODE ? createMockEntity([]) : base44.entities.Paymen
 export const Document = DEMO_MODE ? createMockEntity([]) : base44.entities.Document;
 export const Message = DEMO_MODE ? createMockEntity([]) : base44.entities.Message;
 export const AppSettings = DEMO_MODE ? createMockEntity([]) : base44.entities.AppSettings;
-
-// auth sdk:
-export const User = base44.auth;
+export const User = DEMO_MODE ? base44.entities.User : base44.entities.User;

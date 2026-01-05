@@ -26,6 +26,8 @@ import Invoices from "./Invoices";
 
 import Labs from "./Labs";
 
+import Login from "./Login";
+
 import Map from "./Map";
 
 import OwnerView from "./OwnerView";
@@ -46,56 +48,83 @@ import Tests from "./Tests";
 
 import TechnicianPerformance from "./TechnicianPerformance";
 
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import UserManagement from "./UserManagement";
+
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
+
+import { useAuth } from "@/components/useAuth";
 
 const PAGES = {
-    
+
     Automation: Automation,
-    
+
     Calendar: Calendar,
-    
+
     ClientPortal: ClientPortal,
-    
+
     ClientProfile: ClientProfile,
-    
+
     Clients: Clients,
-    
+
     Communications: Communications,
-    
+
     CustomReports: CustomReports,
-    
+
     Dashboard: Dashboard,
-    
+
     Documents: Documents,
-    
+
     Expenses: Expenses,
-    
+
     Home: Home,
-    
+
     Invoices: Invoices,
-    
+
     Labs: Labs,
-    
+
+    Login: Login,
+
     Map: Map,
-    
+
     OwnerView: OwnerView,
-    
+
     Payments: Payments,
-    
+
     Reports: Reports,
-    
+
     Settings: Settings,
-    
+
     TechnicianProfile: TechnicianProfile,
-    
+
     Technicians: Technicians,
-    
+
     TestProfile: TestProfile,
-    
+
     Tests: Tests,
-    
+
     TechnicianPerformance: TechnicianPerformance,
-    
+
+    UserManagement: UserManagement,
+
+}
+
+// Protected route wrapper
+function ProtectedRoute({ children }) {
+    const { isLoggedIn, isLoading } = useAuth();
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-[#F5F3FF] via-[#F0F9FF] to-[#FFF7ED] flex items-center justify-center">
+                <div className="text-purple-600">Loading...</div>
+            </div>
+        );
+    }
+
+    if (!isLoggedIn) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return children;
 }
 
 function _getCurrentPage(url) {
@@ -115,7 +144,31 @@ function _getCurrentPage(url) {
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
-    
+    const { isLoggedIn, isLoading } = useAuth();
+
+    // Show login page without layout
+    if (location.pathname === '/login') {
+        return (
+            <Routes>
+                <Route path="/login" element={isLoggedIn ? <Navigate to="/" replace /> : <Login />} />
+            </Routes>
+        );
+    }
+
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-[#F5F3FF] via-[#F0F9FF] to-[#FFF7ED] flex items-center justify-center">
+                <div className="text-purple-600">Loading...</div>
+            </div>
+        );
+    }
+
+    // Redirect to login if not authenticated
+    if (!isLoggedIn) {
+        return <Navigate to="/login" replace />;
+    }
+
     return (
         <Layout currentPageName={currentPage}>
             <Routes>
@@ -168,6 +221,8 @@ function PagesContent() {
                 <Route path="/tests" element={<Tests />} />
 
                 <Route path="/technicianperformance" element={<TechnicianPerformance />} />
+
+                <Route path="/usermanagement" element={<UserManagement />} />
 
             </Routes>
         </Layout>

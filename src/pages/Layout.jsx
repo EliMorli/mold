@@ -3,16 +3,16 @@ import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import GlobalSearch from "@/components/GlobalSearch";
-import { 
-  LayoutDashboard, 
-  FlaskConical, 
-  Users, 
-  Wrench, 
-  Microscope, 
-  Receipt, 
-  Wallet, 
-  Calendar, 
-  FileText, 
+import {
+  LayoutDashboard,
+  FlaskConical,
+  Users,
+  Wrench,
+  Microscope,
+  Receipt,
+  Wallet,
+  Calendar,
+  FileText,
   Crown,
   Settings,
   Menu,
@@ -22,7 +22,8 @@ import {
   MessageSquare,
   Zap,
   Search,
-  TrendingUp
+  TrendingUp,
+  Shield
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/useAuth";
@@ -46,6 +47,7 @@ const allNavigationItems = [
   { title: "Communications", url: createPageUrl("Communications"), icon: FileText, access: "communications" },
   { title: "Automation", url: createPageUrl("Automation"), icon: Settings, access: "automation" },
   { title: "Owner's View", url: createPageUrl("OwnerView"), icon: Crown, access: "owner-view" },
+  { title: "Users", url: createPageUrl("UserManagement"), icon: Shield, access: "users" },
   { title: "Settings", url: createPageUrl("Settings"), icon: Settings, access: "settings" },
 ];
 
@@ -53,7 +55,7 @@ export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const { user, canView, appRole } = useAuth();
+  const { user, canView, appRole, logout } = useAuth();
 
   // Global search keyboard shortcut
   useEffect(() => {
@@ -198,7 +200,7 @@ export default function Layout({ children, currentPageName }) {
               <p className="text-xs text-purple-400 truncate">{appRole}</p>
             </div>
             <button
-              onClick={() => base44.auth.logout()}
+              onClick={logout}
               className="clay-button rounded-xl p-2 hover:scale-110 transition-transform"
               title="Logout"
             >

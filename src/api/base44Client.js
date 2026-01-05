@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 7;
+const DEMO_DATA_VERSION = 8;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -96,6 +96,60 @@ const INITIAL_INVOICES = [
   { id: '10', invoice_number: 'INV-2024-098', client_id: '13', client_name: 'Thompson Construction Co', total: 1100, status: 'Overdue', issue_date: daysAgo(45), due_date: daysAgo(30), created_date: daysAgo(45) },
 ];
 
+// Initial users - admin creates and manages these
+const INITIAL_USERS = [
+  {
+    id: '1',
+    username: 'admin',
+    password: 'admin123', // In production, this would be hashed
+    full_name: 'System Admin',
+    email: 'admin@johnmold.com',
+    role: 'Admin',
+    permissions: {
+      dashboard: { view: true, edit: true },
+      tests: { view: true, edit: true, create: true, delete: true },
+      clients: { view: true, edit: true, create: true, delete: true },
+      technicians: { view: true, edit: true, create: true, delete: true },
+      labs: { view: true, edit: true, create: true, delete: true },
+      invoices: { view: true, edit: true, create: true, delete: true },
+      payments: { view: true, edit: true, create: true, delete: true },
+      expenses: { view: true, edit: true, create: true, delete: true },
+      calendar: { view: true, edit: true },
+      map: { view: true, edit: true },
+      documents: { view: true, edit: true, create: true, delete: true },
+      reports: { view: true, edit: true },
+      communications: { view: true, edit: true },
+      automation: { view: true, edit: true },
+      'owner-view': { view: true, edit: true },
+      settings: { view: true, edit: true },
+      users: { view: true, edit: true, create: true, delete: true },
+    },
+    status: 'Active',
+    created_date: '2024-01-01T00:00:00.000Z'
+  },
+  {
+    id: '2',
+    username: 'tech1',
+    password: 'tech123',
+    full_name: 'Marcus Johnson',
+    email: 'marcus.j@johnmold.com',
+    role: 'Technician',
+    permissions: {
+      dashboard: { view: true, edit: true },
+      tests: { view: true, edit: true, create: true, delete: false },
+      clients: { view: true, edit: false, create: false, delete: false },
+      technicians: { view: true, edit: false, create: false, delete: false },
+      labs: { view: true, edit: false, create: false, delete: false },
+      calendar: { view: true, edit: true },
+      map: { view: true, edit: true },
+      documents: { view: true, edit: false, create: false, delete: false },
+      reports: { view: true, edit: false },
+    },
+    status: 'Active',
+    created_date: '2024-01-15T00:00:00.000Z'
+  },
+];
+
 const INITIAL_EXPENSES = [
   // Lab Fees
   { id: '1', description: 'EMSL Lab Analysis - 15 samples', category: 'Lab Fees', amount: 450, date: daysAgo(5), vendor: 'EMSL Analytical Inc', notes: 'Invoice #EMB-45892' },
@@ -159,6 +213,7 @@ if (typeof window !== 'undefined') {
       clients: INITIAL_CLIENTS,
       invoices: INITIAL_INVOICES,
       expenses: INITIAL_EXPENSES,
+      users: INITIAL_USERS,
     };
 
     Object.entries(dataToInit).forEach(([key, initialData]) => {
@@ -242,6 +297,7 @@ const INITIAL_DATA_MAP = {
   documents: [],
   messages: [],
   settings: [],
+  users: INITIAL_USERS,
 };
 
 // Create mock entity wrapper with localStorage persistence
@@ -296,6 +352,38 @@ const realClient = createClient({
   requiresAuth: !DEMO_MODE
 });
 
+// Session management for demo mode
+const SESSION_KEY = 'demo_session';
+
+const getSession = () => {
+  try {
+    const session = localStorage.getItem(SESSION_KEY);
+    if (session) {
+      const parsed = JSON.parse(session);
+      // Check if session is still valid (24 hours)
+      if (parsed.expiresAt && new Date(parsed.expiresAt) > new Date()) {
+        return parsed;
+      }
+      localStorage.removeItem(SESSION_KEY);
+    }
+  } catch (e) {
+    console.error('Session error:', e);
+  }
+  return null;
+};
+
+const setSession = (user) => {
+  const session = {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+};
+
+const clearSession = () => {
+  localStorage.removeItem(SESSION_KEY);
+};
+
 // Mock client for demo mode with localStorage persistence
 const mockClient = {
   entities: {
@@ -309,12 +397,46 @@ const mockClient = {
     Document: createMockEntity('documents'),
     Message: createMockEntity('messages'),
     AppSettings: createMockEntity('settings'),
+    User: createMockEntity('users'),
   },
   auth: {
-    me: () => Promise.resolve({ id: 'demo', full_name: 'Demo Admin', email: 'demo@example.com', app_role: 'Admin' }),
-    logout: () => { window.location.href = '/'; },
+    me: () => {
+      const session = getSession();
+      if (!session) {
+        return Promise.resolve(null);
+      }
+      const users = getStoredData('users', INITIAL_USERS);
+      const user = users.find(u => u.id === session.userId);
+      if (user && user.status === 'Active') {
+        // Return user without password
+        const { password, ...safeUser } = user;
+        return Promise.resolve(safeUser);
+      }
+      clearSession();
+      return Promise.resolve(null);
+    },
+    login: (username, password) => {
+      const users = getStoredData('users', INITIAL_USERS);
+      const user = users.find(u => u.username === username && u.password === password);
+      if (user && user.status === 'Active') {
+        setSession(user);
+        const { password: _, ...safeUser } = user;
+        return Promise.resolve({ success: true, user: safeUser });
+      }
+      return Promise.resolve({ success: false, error: 'Invalid username or password' });
+    },
+    logout: () => {
+      clearSession();
+      window.location.href = '/login';
+    },
+    isLoggedIn: () => {
+      return getSession() !== null;
+    },
   },
 };
+
+// Export session helpers for use in other files
+export { getSession, clearSession };
 
 // Export the appropriate client based on demo mode
 export const base44 = DEMO_MODE ? mockClient : realClient;
