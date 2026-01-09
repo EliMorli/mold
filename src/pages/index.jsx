@@ -46,6 +46,10 @@ import Tests from "./Tests";
 
 import TechnicianPerformance from "./TechnicianPerformance";
 
+import Users from "./Users";
+
+import Verify from "./Verify";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -93,9 +97,11 @@ const PAGES = {
     TestProfile: TestProfile,
     
     Tests: Tests,
-    
+
     TechnicianPerformance: TechnicianPerformance,
-    
+
+    Users: Users,
+
 }
 
 function _getCurrentPage(url) {
@@ -169,6 +175,8 @@ function PagesContent() {
 
                 <Route path="/technicianperformance" element={<TechnicianPerformance />} />
 
+                <Route path="/users" element={<Users />} />
+
             </Routes>
         </Layout>
     );
@@ -177,7 +185,12 @@ function PagesContent() {
 export default function Pages() {
     return (
         <Router>
-            <PagesContent />
+            <Routes>
+                {/* Verify page without layout */}
+                <Route path="/verify" element={<Verify />} />
+                {/* All other pages with layout */}
+                <Route path="/*" element={<PagesContent />} />
+            </Routes>
         </Router>
     );
 }
