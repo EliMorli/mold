@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 7;
+const DEMO_DATA_VERSION = 8;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -51,6 +51,15 @@ const INITIAL_LABS = [
   { id: '1', name: 'EMSL Analytical Inc', email: 'florida@emsl.com', phone: '800-220-3675', address: '2901 SW 8th St, Miami FL 33135', status: 'Active', turnaround_days: 3, notes: 'Primary lab - excellent turnaround' },
   { id: '2', name: 'Pro-Lab Diagnostics', email: 'samples@prolab.com', phone: '800-555-3001', address: '1500 NW 49th St, Fort Lauderdale FL 33309', status: 'Active', turnaround_days: 2, notes: 'Rush orders available' },
   { id: '3', name: 'Florida Environmental Labs', email: 'testing@flenviro.com', phone: '407-555-3002', address: '2200 Winter Park Rd, Orlando FL 32803', status: 'Active', turnaround_days: 4, notes: 'Good for bulk samples' },
+];
+
+// Demo users for admin-controlled user management
+const INITIAL_USERS = [
+  { id: '1', email: 'admin@johnmold.com', name: 'John Admin', role: 'Admin', status: 'Verified', verification_code: null, created_date: daysAgo(365) },
+  { id: '2', email: 'marcus.j@johnmold.com', name: 'Marcus Johnson', role: 'Technician', status: 'Verified', verification_code: null, created_date: daysAgo(200) },
+  { id: '3', email: 'elena.r@johnmold.com', name: 'Elena Rodriguez', role: 'Technician', status: 'Verified', verification_code: null, created_date: daysAgo(150) },
+  { id: '4', email: 'james.c@johnmold.com', name: 'James Cooper', role: 'Technician', status: 'Verified', verification_code: null, created_date: daysAgo(120) },
+  { id: '5', email: 'newuser@example.com', name: 'Pending User', role: 'Viewer', status: 'Pending', verification_code: '847291', created_date: daysAgo(1) },
 ];
 
 const INITIAL_TESTS = [
@@ -159,6 +168,7 @@ if (typeof window !== 'undefined') {
       clients: INITIAL_CLIENTS,
       invoices: INITIAL_INVOICES,
       expenses: INITIAL_EXPENSES,
+      users: INITIAL_USERS,
     };
 
     Object.entries(dataToInit).forEach(([key, initialData]) => {
@@ -238,6 +248,7 @@ const INITIAL_DATA_MAP = {
   labs: INITIAL_LABS,
   invoices: INITIAL_INVOICES,
   expenses: INITIAL_EXPENSES,
+  users: INITIAL_USERS,
   payments: [],
   documents: [],
   messages: [],
@@ -305,6 +316,7 @@ const mockClient = {
     Lab: createMockEntity('labs'),
     Invoice: createMockEntity('invoices'),
     Expense: createMockEntity('expenses'),
+    User: createMockEntity('users'),
     Payment: createMockEntity('payments'),
     Document: createMockEntity('documents'),
     Message: createMockEntity('messages'),

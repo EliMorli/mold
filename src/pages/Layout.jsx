@@ -3,16 +3,16 @@ import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import GlobalSearch from "@/components/GlobalSearch";
-import { 
-  LayoutDashboard, 
-  FlaskConical, 
-  Users, 
-  Wrench, 
-  Microscope, 
-  Receipt, 
-  Wallet, 
-  Calendar, 
-  FileText, 
+import {
+  LayoutDashboard,
+  FlaskConical,
+  Users,
+  Wrench,
+  Microscope,
+  Receipt,
+  Wallet,
+  Calendar,
+  FileText,
   Crown,
   Settings,
   Menu,
@@ -22,7 +22,8 @@ import {
   MessageSquare,
   Zap,
   Search,
-  TrendingUp
+  TrendingUp,
+  UserCog
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/useAuth";
@@ -46,6 +47,7 @@ const allNavigationItems = [
   { title: "Communications", url: createPageUrl("Communications"), icon: FileText, access: "communications" },
   { title: "Automation", url: createPageUrl("Automation"), icon: Settings, access: "automation" },
   { title: "Owner's View", url: createPageUrl("OwnerView"), icon: Crown, access: "owner-view" },
+  { title: "User Management", url: createPageUrl("Users"), icon: UserCog, access: "settings" },
   { title: "Settings", url: createPageUrl("Settings"), icon: Settings, access: "settings" },
 ];
 
