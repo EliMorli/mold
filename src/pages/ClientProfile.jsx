@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import { createPageUrl } from "@/utils";
 import { 
   ArrowLeft, 
-  Save, 
   Building2,
   Users,
   Mail,
@@ -175,7 +174,6 @@ export default function ClientProfilePage() {
   
   // Calculate stats
   const totalTests = clientTests.length;
-  const completedTests = clientTests.filter(t => t.status === 'Completed').length;
   const totalRevenue = clientInvoices.filter(i => i.status === 'Paid').reduce((sum, inv) => sum + (inv.total || 0), 0);
   const openBalance = clientInvoices.filter(i => i.status === 'Sent' || i.status === 'Overdue').reduce((sum, inv) => sum + (inv.total || 0), 0);
   const avgTestCost = totalTests > 0 ? totalRevenue / totalTests : 0;
@@ -677,7 +675,7 @@ export default function ClientProfilePage() {
               </div>
               <div className="clay-button rounded-2xl p-4 bg-blue-50">
                 <p className="text-xs text-blue-800">
-                  The client will receive an invitation email to set their password. Once they log in, they'll automatically see only their personalized portal with their tests and invoices.
+                  The client will receive an invitation email to set their password. Once they log in, they&apos;ll automatically see only their personalized portal with their tests and invoices.
                 </p>
               </div>
             </div>

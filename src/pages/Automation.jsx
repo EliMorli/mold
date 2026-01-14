@@ -111,7 +111,7 @@ export default function AutomationPage() {
           <div>
             <h3 className="text-lg font-bold text-blue-800 mb-2">Automated Scheduling</h3>
             <p className="text-sm text-blue-700 mb-3">
-              These automations run automatically on their configured schedules. You can manually trigger them anytime using the "Run Now" button for testing or immediate execution.
+              These automations run automatically on their configured schedules. You can manually trigger them anytime using the &quot;Run Now&quot; button for testing or immediate execution.
             </p>
             <div className="clay-button rounded-2xl p-3 bg-white inline-block">
               <p className="text-xs text-gray-600">
@@ -251,7 +251,7 @@ export default function AutomationPage() {
             <ul className="text-sm text-gray-600 space-y-1 ml-6 list-disc">
               <li>Checks all documents daily for upcoming expiration dates</li>
               <li>Sends email alerts based on configured alert days (default 30 days)</li>
-              <li>Updates document status to "Pending Renewal" or "Expired"</li>
+              <li>Updates document status to &quot;Pending Renewal&quot; or &quot;Expired&quot;</li>
               <li>Includes document details and issuing authority in notifications</li>
             </ul>
           </div>

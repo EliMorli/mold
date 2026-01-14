@@ -8,19 +8,17 @@ import {
   DollarSign,
   AlertCircle,
   CheckCircle,
-  Clock,
   Calendar as CalendarIcon,
   FileText,
   Receipt,
   MapPin,
   User as UserIcon,
   RefreshCw,
-  Download
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 
 export default function Dashboard() {
   const [activeFilter, setActiveFilter] = useState("All Active");
@@ -62,7 +60,6 @@ export default function Dashboard() {
 
   // Calculate stats
   const activeTests = tests.filter(t => t.status === 'In Progress' || t.status === 'Scheduled').length;
-  const completedTests = tests.filter(t => t.status === 'Completed').length;
   const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((sum, inv) => sum + (inv.total || 0), 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
   const netProfit = totalRevenue - totalExpenses;
@@ -128,11 +125,6 @@ export default function Dashboard() {
     { name: 'Lab Analysis', value: tests.filter(t => t.status === 'Lab Analysis').length, color: '#DDA0DD' },
     { name: 'Completed', value: tests.filter(t => t.status === 'Completed').length, color: '#98D8C8' },
   ].filter(d => d.value > 0);
-
-  // Recent tests for timeline
-  const recentTests = [...tests].sort((a, b) => 
-    new Date(b.created_date) - new Date(a.created_date)
-  ).slice(0, 5);
 
   // Monthly revenue trend - REAL DATA from last 6 months
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
@@ -228,7 +220,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
               Dashboard Overview
             </h1>
-            <p className="text-gray-500 mt-2">Welcome back! Here's what needs your attention today.</p>
+            <p className="text-gray-500 mt-2">Welcome back! Here&apos;s what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-3">
             <p className="text-xs text-gray-400">
