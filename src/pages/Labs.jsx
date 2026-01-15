@@ -131,7 +131,13 @@ export default function LabsPage() {
                 Samples: <strong className="text-gray-700">{lab.total_samples_sent || 0}</strong>
               </span>
               <span className="text-gray-500">
-                {lab.cost_per_sample > 0 ? `$${lab.cost_per_sample}/sample` : 'Contact for pricing'}
+                {(() => {
+                  const cost = parseFloat(lab.cost_per_sample);
+                  if (cost > 0 && !isNaN(cost)) {
+                    return `$${cost}/sample`;
+                  }
+                  return 'Contact for pricing';
+                })()}
               </span>
             </div>
           </div>

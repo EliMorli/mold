@@ -69,23 +69,35 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('=== INVOICE FORM SUBMIT ===');
+    console.log('formData.client_id:', formData.client_id, 'type:', typeof formData.client_id);
+    console.log('formData.amount:', formData.amount, 'type:', typeof formData.amount);
+
     const newErrors = {};
 
-    // Validate client selection
-    if (!formData.client_id) {
+    // Validate client selection - check for empty string, null, undefined
+    if (!formData.client_id || formData.client_id === '' || formData.client_id === null || formData.client_id === undefined) {
       newErrors.client_id = 'Please select a client';
+      console.log('VALIDATION FAILED: client_id is empty');
     }
 
-    // Validate amount is positive
-    if (formData.amount < 0) {
+    // Validate amount is not negative
+    const amount = parseFloat(formData.amount) || 0;
+    if (amount < 0) {
       newErrors.amount = 'Amount must be a positive number';
+      console.log('VALIDATION FAILED: amount is negative:', amount);
     }
+
+    console.log('Validation errors:', newErrors);
+    console.log('Number of errors:', Object.keys(newErrors).length);
 
     if (Object.keys(newErrors).length > 0) {
+      console.log('STOPPING SUBMISSION - validation failed');
       setErrors(newErrors);
       return;
     }
 
+    console.log('VALIDATION PASSED - calling onSave');
     setErrors({});
     onSave(formData);
   };
