@@ -131,7 +131,7 @@ export default function LabsPage() {
                 Samples: <strong className="text-gray-700">{lab.total_samples_sent || 0}</strong>
               </span>
               <span className="text-gray-500">
-                ${(lab.cost_per_sample || 0)}/sample
+                {lab.cost_per_sample > 0 ? `$${lab.cost_per_sample}/sample` : 'Contact for pricing'}
               </span>
             </div>
           </div>

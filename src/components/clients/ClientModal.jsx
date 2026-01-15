@@ -7,6 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from "@/api/base44Client";
 
+// Phone validation regex: allows digits, spaces, dashes, parentheses, plus sign
+const isValidPhone = (phone) => {
+  if (!phone) return false;
+  const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+  const digitsOnly = phone.replace(/\D/g, '');
+  return phoneRegex.test(phone) && digitsOnly.length >= 7;
+};
+
 export default function ClientModal({ client, onClose, onSave }) {
   const [clientType, setClientType] = useState(client?.client_type || 'Direct Client');
   const [formData, setFormData] = useState({
@@ -22,6 +30,7 @@ export default function ClientModal({ client, onClose, onSave }) {
     notes: '',
     ...client
   });
+  const [errors, setErrors] = useState({});
 
   const addressInputRef = useRef(null);
   const autocompleteRef = useRef(null);
@@ -98,6 +107,19 @@ export default function ClientModal({ client, onClose, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const newErrors = {};
+
+    // Validate phone number
+    if (!isValidPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
     const dataToSave = {
       ...formData,
       client_type: clientType
@@ -167,11 +189,14 @@ export default function ClientModal({ client, onClose, onSave }) {
                   </Label>
                   <Input
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="clay-button rounded-2xl border-0"
+                    onChange={(e) => { setFormData({...formData, phone: e.target.value}); setErrors({...errors, phone: ''}); }}
+                    className={`clay-button rounded-2xl border-0 ${errors.phone ? 'ring-2 ring-red-400' : ''}`}
                     placeholder="(555) 123-4567"
                     required
                   />
+                  {errors.phone && (
+                    <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                  )}
                 </div>
 
                 <div>
@@ -241,11 +266,14 @@ export default function ClientModal({ client, onClose, onSave }) {
                     </Label>
                     <Input
                       value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      className="clay-button rounded-2xl border-0"
+                      onChange={(e) => { setFormData({...formData, phone: e.target.value}); setErrors({...errors, phone: ''}); }}
+                      className={`clay-button rounded-2xl border-0 ${errors.phone ? 'ring-2 ring-red-400' : ''}`}
                       placeholder="(555) 123-4567"
                       required
                     />
+                    {errors.phone && (
+                      <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                    )}
                   </div>
 
                   <div className="md:col-span-2">
