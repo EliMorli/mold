@@ -404,26 +404,42 @@ export default function PaymentsPage() {
 
             <form onSubmit={(e) => {
               e.preventDefault();
+              console.log('=== PAYMENT FORM SUBMIT ===');
+              console.log('selectedPayment:', selectedPayment);
+              console.log('formData.client_id:', formData.client_id, 'type:', typeof formData.client_id);
+              console.log('formData.amount:', formData.amount, 'type:', typeof formData.amount);
+
               const newErrors = {};
 
-              // Validate client selection for new payments
-              if (!selectedPayment && !formData.client_id) {
-                newErrors.client_id = 'Please select a client';
+              // Validate client selection for new payments - check all falsy values
+              if (!selectedPayment) {
+                if (!formData.client_id || formData.client_id === '' || formData.client_id === null || formData.client_id === undefined) {
+                  newErrors.client_id = 'Please select a client';
+                  console.log('VALIDATION FAILED: client_id is empty');
+                }
               }
 
               // Validate amount is positive (at least $0.01)
-              if (formData.amount < 0.01) {
+              const amount = parseFloat(formData.amount) || 0;
+              if (amount < 0.01) {
                 newErrors.amount = 'Amount must be at least $0.01';
+                console.log('VALIDATION FAILED: amount too low:', amount);
               }
 
+              console.log('Validation errors:', newErrors);
+              console.log('Number of errors:', Object.keys(newErrors).length);
+
               if (Object.keys(newErrors).length > 0) {
+                console.log('STOPPING SUBMISSION - validation failed');
                 setErrors(newErrors);
                 return;
               }
 
+              console.log('VALIDATION PASSED');
               setErrors({});
 
               if (selectedPayment) {
+                console.log('Updating existing payment');
                 updateMutation.mutate({ id: selectedPayment.id, data: formData });
               } else {
                 // For new payments, ensure allocated amount doesn't exceed payment amount
@@ -431,6 +447,7 @@ export default function PaymentsPage() {
                   alert('Total allocated amount cannot exceed the payment amount. Please adjust allocations.');
                   return;
                 }
+                console.log('Creating new payment');
                 createMutation.mutate(formData);
               }
             }} className="space-y-6">

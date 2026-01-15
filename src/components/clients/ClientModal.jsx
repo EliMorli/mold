@@ -7,12 +7,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from "@/api/base44Client";
 
-// Phone validation regex: allows digits, spaces, dashes, parentheses, plus sign
+// Phone validation: allows only digits, spaces, dashes, parentheses, plus sign
+// Must have at least 7 digits
 const isValidPhone = (phone) => {
-  if (!phone) return false;
+  console.log('=== PHONE VALIDATION ===');
+  console.log('Input phone:', phone, 'type:', typeof phone);
+
+  if (!phone || phone === '' || phone === null || phone === undefined) {
+    console.log('Phone is empty/null/undefined');
+    return false;
+  }
+
+  // Check for any letters (which would make it invalid)
+  const hasLetters = /[a-zA-Z]/.test(phone);
+  if (hasLetters) {
+    console.log('Phone contains letters - INVALID');
+    return false;
+  }
+
+  // Only allow digits, spaces, dashes, parentheses, plus sign
   const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+  const passesRegex = phoneRegex.test(phone);
+  console.log('Regex test result:', passesRegex);
+
+  // Must have at least 7 digits
   const digitsOnly = phone.replace(/\D/g, '');
-  return phoneRegex.test(phone) && digitsOnly.length >= 7;
+  const hasEnoughDigits = digitsOnly.length >= 7;
+  console.log('Digits only:', digitsOnly, 'count:', digitsOnly.length, 'has enough:', hasEnoughDigits);
+
+  const isValid = passesRegex && hasEnoughDigits;
+  console.log('Final isValid:', isValid);
+  return isValid;
 };
 
 export default function ClientModal({ client, onClose, onSave }) {
@@ -107,18 +132,32 @@ export default function ClientModal({ client, onClose, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('=== CLIENT FORM SUBMIT ===');
+    console.log('formData.phone:', formData.phone);
+    console.log('formData.name:', formData.name);
+    console.log('formData.email:', formData.email);
+
     const newErrors = {};
 
     // Validate phone number
-    if (!isValidPhone(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
+    const phoneIsValid = isValidPhone(formData.phone);
+    console.log('Phone validation result:', phoneIsValid);
+
+    if (!phoneIsValid) {
+      newErrors.phone = 'Please enter a valid phone number (digits, dashes, spaces only)';
+      console.log('VALIDATION FAILED: invalid phone');
     }
 
+    console.log('Validation errors:', newErrors);
+    console.log('Number of errors:', Object.keys(newErrors).length);
+
     if (Object.keys(newErrors).length > 0) {
+      console.log('STOPPING SUBMISSION - validation failed');
       setErrors(newErrors);
       return;
     }
 
+    console.log('VALIDATION PASSED - calling onSave');
     setErrors({});
     const dataToSave = {
       ...formData,
