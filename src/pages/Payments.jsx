@@ -15,6 +15,7 @@ export default function PaymentsPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [invoiceAllocations, setInvoiceAllocations] = useState({}); // New state for allocations
+  const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
     payment_date: new Date().toISOString(),
     amount: 0,
@@ -403,6 +404,25 @@ export default function PaymentsPage() {
 
             <form onSubmit={(e) => {
               e.preventDefault();
+              const newErrors = {};
+
+              // Validate client selection for new payments
+              if (!selectedPayment && !formData.client_id) {
+                newErrors.client_id = 'Please select a client';
+              }
+
+              // Validate amount is positive (at least $0.01)
+              if (formData.amount < 0.01) {
+                newErrors.amount = 'Amount must be at least $0.01';
+              }
+
+              if (Object.keys(newErrors).length > 0) {
+                setErrors(newErrors);
+                return;
+              }
+
+              setErrors({});
+
               if (selectedPayment) {
                 updateMutation.mutate({ id: selectedPayment.id, data: formData });
               } else {
@@ -419,11 +439,10 @@ export default function PaymentsPage() {
                   <Label className="text-gray-700 font-medium mb-2 block">Client *</Label>
                   <Select
                     value={formData.client_id}
-                    onValueChange={handleClientChange}
-                    required
+                    onValueChange={(value) => { handleClientChange(value); setErrors({...errors, client_id: ''}); }}
                     disabled={!!selectedPayment} // Disable client selection when editing
                   >
-                    <SelectTrigger className="clay-button rounded-2xl border-0">
+                    <SelectTrigger className={`clay-button rounded-2xl border-0 ${errors.client_id ? 'ring-2 ring-red-400' : ''}`}>
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent>
@@ -432,6 +451,9 @@ export default function PaymentsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.client_id && (
+                    <p className="text-red-500 text-xs mt-1">{errors.client_id}</p>
+                  )}
                 </div>
 
                 <div>
@@ -450,11 +472,15 @@ export default function PaymentsPage() {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
-                    className="clay-button rounded-2xl border-0"
+                    onChange={(e) => { setFormData({...formData, amount: parseFloat(e.target.value) || 0}); setErrors({...errors, amount: ''}); }}
+                    className={`clay-button rounded-2xl border-0 ${errors.amount ? 'ring-2 ring-red-400' : ''}`}
                     required
                   />
+                  {errors.amount && (
+                    <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
+                  )}
                 </div>
 
                 <div>

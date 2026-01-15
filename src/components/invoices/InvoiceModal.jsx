@@ -27,6 +27,7 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
     notes: '',
     ...invoice
   });
+  const [errors, setErrors] = useState({});
 
   // Auto-generate invoice number for new invoices
   useEffect(() => {
@@ -68,6 +69,24 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const newErrors = {};
+
+    // Validate client selection
+    if (!formData.client_id) {
+      newErrors.client_id = 'Please select a client';
+    }
+
+    // Validate amount is positive
+    if (formData.amount < 0) {
+      newErrors.amount = 'Amount must be a positive number';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
     onSave(formData);
   };
 
@@ -216,8 +235,8 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
               <Label className="text-gray-700 font-medium mb-2 block">
                 Client <span className="text-red-500">*</span>
               </Label>
-              <Select value={formData.client_id} onValueChange={handleClientChange} required>
-                <SelectTrigger className="clay-button rounded-2xl border-0">
+              <Select value={formData.client_id} onValueChange={(value) => { handleClientChange(value); setErrors({...errors, client_id: ''}); }}>
+                <SelectTrigger className={`clay-button rounded-2xl border-0 ${errors.client_id ? 'ring-2 ring-red-400' : ''}`}>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent className="z-[60]">
@@ -226,6 +245,9 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
                   ))}
                 </SelectContent>
               </Select>
+              {errors.client_id && (
+                <p className="text-red-500 text-xs mt-1">{errors.client_id}</p>
+              )}
             </div>
 
             <div>
@@ -277,12 +299,16 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
               <Input
                 type="number"
                 step="0.01"
+                min="0"
                 value={formData.amount}
-                onChange={(e) => handleAmountChange(parseFloat(e.target.value) || 0)}
-                className="clay-button rounded-2xl border-0"
+                onChange={(e) => { handleAmountChange(parseFloat(e.target.value) || 0); setErrors({...errors, amount: ''}); }}
+                className={`clay-button rounded-2xl border-0 ${errors.amount ? 'ring-2 ring-red-400' : ''}`}
                 placeholder="0.00"
                 required
               />
+              {errors.amount && (
+                <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
+              )}
             </div>
 
             <div>
