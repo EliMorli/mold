@@ -1,8 +1,22 @@
-# Base44 App
+# JohnMold Web App
 
+A Vite + React operations app for mold inspection workflows.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+## Prerequisites
+
+- Node.js 20+
+- npm 10+
+- Base44 app configured
+- Google OAuth URL (for direct Google sign-in)
+
+## Environment
+
+Copy `.env.example` to `.env` and set:
+
+```bash
+VITE_BASE44_APP_ID=your_base44_app_id
+VITE_GOOGLE_AUTH_URL=https://your-auth-provider-url
+```
 
 ## Running the app
 
@@ -11,10 +25,15 @@ npm install
 npm run dev
 ```
 
-## Building the app
+## Production build
 
 ```bash
 npm run build
 ```
 
-For more information and support, please contact Base44 support at app@base44.com.
+## Quality checks
+
+```bash
+npm run lint
+npm test
+```
