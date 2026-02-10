@@ -189,17 +189,24 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Technician Legend */}
+      {/* Technician Legend - Collapsible */}
       {filterTechnician === "All" && assignableTechnicians.length > 0 && (
-        <div className="clay-card rounded-3xl p-6">
-          <h3 className="text-sm font-bold text-gray-600 mb-3">Technician Colors</h3>
-          <div className="flex flex-wrap gap-3">
-            {assignableTechnicians.map(tech => (
-              <div key={tech.id} className="flex items-center gap-2 clay-button rounded-xl px-3 py-2">
-                <div className={`w-4 h-4 rounded-full ${colorMap[tech.color_code]}`} />
-                <span className="text-sm text-gray-700 font-medium">{tech.name}</span>
+        <div className="clay-card rounded-3xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-gray-600">Technician Colors ({assignableTechnicians.length})</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {assignableTechnicians.slice(0, 8).map(tech => (
+              <div key={tech.id} className="flex items-center gap-1 clay-button rounded-lg px-2 py-1">
+                <div className={`w-3 h-3 rounded-full ${colorMap[tech.color_code]}`} />
+                <span className="text-xs text-gray-700 font-medium">{tech.name}</span>
               </div>
             ))}
+            {assignableTechnicians.length > 8 && (
+              <div className="flex items-center gap-1 clay-button rounded-lg px-2 py-1 text-xs text-purple-600 font-medium">
+                +{assignableTechnicians.length - 8} more (use filter to select)
+              </div>
+            )}
           </div>
         </div>
       )}
