@@ -777,6 +777,87 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {/* Today's Schedule */}
+          <div className="clay-card rounded-3xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-purple-500" />
+                Today's Schedule
+              </h3>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-purple-100 text-purple-700 rounded-lg px-3 py-1">
+                  {tests.filter(t => {
+                    if (!t.scheduled_date) return false;
+                    const testDate = new Date(t.scheduled_date);
+                    const today = new Date();
+                    return testDate.toDateString() === today.toDateString();
+                  }).length} jobs today
+                </Badge>
+                <button
+                  onClick={() => setActiveTab('daily')}
+                  className="text-sm text-purple-600 font-medium hover:underline"
+                >
+                  View All →
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {tests
+                .filter(t => {
+                  if (!t.scheduled_date) return false;
+                  const testDate = new Date(t.scheduled_date);
+                  const today = new Date();
+                  return testDate.toDateString() === today.toDateString();
+                })
+                .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
+                .slice(0, 6)
+                .map(test => {
+                  const technician = technicians.find(t => t.id === test.technician_id);
+                  return (
+                    <div
+                      key={test.id}
+                      onClick={() => window.location.href = `${createPageUrl('TestProfile')}?id=${test.id}`}
+                      className="clay-button rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform"
+                    >
+                      <div className="text-center min-w-[60px]">
+                        <p className="text-sm font-bold text-purple-600">
+                          {new Date(test.scheduled_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        </p>
+                      </div>
+                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${colorMap[technician?.color_code] || 'from-purple-400 to-purple-500'} flex items-center justify-center`}>
+                        <FlaskConical className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-800 text-sm">{test.test_number}</p>
+                        <p className="text-xs text-gray-500 truncate">{test.property_address}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={`${statusColors[test.status]} border rounded-lg px-2 py-0.5 text-xs`}>
+                          {test.status}
+                        </Badge>
+                        {technician && (
+                          <p className="text-xs text-gray-500 mt-1">{technician.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {tests.filter(t => {
+                if (!t.scheduled_date) return false;
+                const testDate = new Date(t.scheduled_date);
+                const today = new Date();
+                return testDate.toDateString() === today.toDateString();
+              }).length === 0 && (
+                <div className="text-center py-6">
+                  <CalendarIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No jobs scheduled for today</p>
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
 
