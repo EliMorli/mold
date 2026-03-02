@@ -484,6 +484,38 @@ export default function TestProfilePage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="pt-3 border-t border-gray-200">
+                  <p className="text-sm font-medium text-gray-600 mb-3">Referral Source</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-700 font-medium mb-2 block">Referral Company</Label>
+                      <Input
+                        value={formData.referral_company || ''}
+                        onChange={(e) => setFormData({...formData, referral_company: e.target.value})}
+                        className="clay-button rounded-2xl border-0"
+                        placeholder="Company that referred this job"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-gray-700 font-medium mb-2 block">Sales Rep Name</Label>
+                      <Input
+                        value={formData.sales_rep_name || ''}
+                        onChange={(e) => setFormData({...formData, sales_rep_name: e.target.value})}
+                        className="clay-button rounded-2xl border-0"
+                        placeholder="Rep who sent the job"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <Label className="text-gray-700 font-medium mb-2 block">Sales Rep Phone</Label>
+                    <Input
+                      value={formData.sales_rep_phone || ''}
+                      onChange={(e) => setFormData({...formData, sales_rep_phone: e.target.value})}
+                      className="clay-button rounded-2xl border-0"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -501,21 +533,26 @@ export default function TestProfilePage() {
                     <p className="text-gray-700">{formData.client_email || 'N/A'}</p>
                   </div>
                 </div>
-                {formData.sales_rep_name && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm text-gray-500 mb-2">Sales Representative</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500">Name</p>
-                        <p className="text-gray-700">{formData.sales_rep_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Phone</p>
-                        <p className="text-gray-700">{formData.sales_rep_phone || 'N/A'}</p>
-                      </div>
+                {/* Referral Source */}
+                <div className="pt-3 border-t border-gray-200">
+                  <p className="text-sm text-gray-500 mb-2">Referral Source</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Referral Company</p>
+                      <p className="text-gray-700">{formData.referral_company || 'Direct / No Referral'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Sales Rep</p>
+                      <p className="text-gray-700">{formData.sales_rep_name || 'N/A'}</p>
                     </div>
                   </div>
-                )}
+                  {formData.sales_rep_phone && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">Sales Rep Phone</p>
+                      <p className="text-gray-700">{formData.sales_rep_phone}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -824,6 +861,243 @@ export default function TestProfilePage() {
 
         {/* Right Column - Documents & Photos */}
         <div className="space-y-6">
+          {/* Report Tracking */}
+          <div className="clay-card rounded-3xl p-6">
+            <h3 className="text-lg font-bold text-emerald-600 flex items-center gap-2 mb-4">
+              <Check className="w-5 h-5" />
+              Report Tracking
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between clay-button rounded-2xl p-4">
+                <div>
+                  <p className="font-medium text-gray-700">In Reports</p>
+                  <p className="text-xs text-gray-500">Lab results received</p>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="checkbox"
+                    checked={formData.in_reports || false}
+                    onChange={(e) => setFormData({...formData, in_reports: e.target.checked})}
+                    className="w-5 h-5 rounded accent-emerald-500"
+                  />
+                ) : (
+                  <Badge className={formData.in_reports ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>
+                    {formData.in_reports ? '✓ Received' : 'Pending'}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between clay-button rounded-2xl p-4">
+                <div>
+                  <p className="font-medium text-gray-700">Out Reports</p>
+                  <p className="text-xs text-gray-500">Report sent to client</p>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="checkbox"
+                    checked={formData.out_reports || false}
+                    onChange={(e) => setFormData({...formData, out_reports: e.target.checked})}
+                    className="w-5 h-5 rounded accent-emerald-500"
+                  />
+                ) : (
+                  <Badge className={formData.out_reports ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}>
+                    {formData.out_reports ? '✓ Sent' : 'Pending'}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Lab Chain of Custody */}
+          <div className="clay-card rounded-3xl p-6">
+            <h3 className="text-lg font-bold text-orange-600 flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5" />
+              Lab Chain of Custody
+            </h3>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Date Sent to Lab</Label>
+                  <Input
+                    type="date"
+                    value={formData.date_sent_to_lab || ''}
+                    onChange={(e) => setFormData({...formData, date_sent_to_lab: e.target.value})}
+                    className="clay-button rounded-2xl border-0"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Lab Received (Date & Time)</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.lab_received_datetime ? formatDateTimeForInput(formData.lab_received_datetime) : ''}
+                    onChange={(e) => {
+                      const receivedDateTime = e.target.value ? new Date(e.target.value).toISOString() : '';
+                      const tat = formData.lab_tat_hours || 24;
+                      let dueDateTime = '';
+                      if (receivedDateTime) {
+                        const dueDate = new Date(receivedDateTime);
+                        dueDate.setHours(dueDate.getHours() + tat);
+                        dueDateTime = dueDate.toISOString();
+                      }
+                      setFormData({
+                        ...formData,
+                        lab_received_datetime: receivedDateTime,
+                        lab_results_due_datetime: dueDateTime
+                      });
+                    }}
+                    className="clay-button rounded-2xl border-0"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">TAT (Hours)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={formData.lab_tat_hours || 24}
+                    onChange={(e) => {
+                      const tat = parseInt(e.target.value) || 24;
+                      let dueDateTime = '';
+                      if (formData.lab_received_datetime) {
+                        const dueDate = new Date(formData.lab_received_datetime);
+                        dueDate.setHours(dueDate.getHours() + tat);
+                        dueDateTime = dueDate.toISOString();
+                      }
+                      setFormData({
+                        ...formData,
+                        lab_tat_hours: tat,
+                        lab_results_due_datetime: dueDateTime
+                      });
+                    }}
+                    className="clay-button rounded-2xl border-0"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Results Due</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.lab_results_due_datetime ? formatDateTimeForInput(formData.lab_results_due_datetime) : ''}
+                    onChange={(e) => setFormData({...formData, lab_results_due_datetime: e.target.value ? new Date(e.target.value).toISOString() : ''})}
+                    className="clay-button rounded-2xl border-0"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Sent to Lab</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {formData.date_sent_to_lab ? new Date(formData.date_sent_to_lab).toLocaleDateString() : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Lab Received</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {formData.lab_received_datetime ? formatDateTime(formData.lab_received_datetime) : '—'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">TAT</p>
+                    <p className="text-sm font-medium text-gray-700">{formData.lab_tat_hours || 24} hours</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Results Due</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {formData.lab_results_due_datetime ? formatDateTime(formData.lab_results_due_datetime) : '—'}
+                    </p>
+                  </div>
+                </div>
+                {formData.lab_results_due_datetime && (
+                  <div className="pt-2">
+                    {(() => {
+                      const now = new Date();
+                      const due = new Date(formData.lab_results_due_datetime);
+                      const isPastDue = now > due && !formData.in_reports;
+                      return (
+                        <Badge className={isPastDue ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}>
+                          {isPastDue ? '⚠️ Past Due' : '✓ On Time'}
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Technician Pay */}
+          <div className="clay-card rounded-3xl p-6">
+            <h3 className="text-lg font-bold text-blue-600 flex items-center gap-2 mb-4">
+              <DollarSign className="w-5 h-5" />
+              Technician Pay
+            </h3>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Pay Amount ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.technician_pay || ''}
+                    onChange={(e) => setFormData({...formData, technician_pay: parseFloat(e.target.value) || 0})}
+                    className="clay-button rounded-2xl border-0"
+                    placeholder="100.00"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Pay Adjustment</Label>
+                  <Select
+                    value={formData.pay_adjustment || 'none'}
+                    onValueChange={(value) => setFormData({...formData, pay_adjustment: value})}
+                  >
+                    <SelectTrigger className="clay-button rounded-2xl border-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Adjustment</SelectItem>
+                      <SelectItem value="extra_distance">Extra Distance (+$)</SelectItem>
+                      <SelectItem value="half_pay">Half Pay (Cancellation)</SelectItem>
+                      <SelectItem value="double_pay">Double Pay</SelectItem>
+                      <SelectItem value="custom">Custom Amount</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.pay_adjustment && formData.pay_adjustment !== 'none' && (
+                  <div>
+                    <Label className="text-gray-700 font-medium mb-2 block">Adjustment Notes</Label>
+                    <Input
+                      value={formData.pay_adjustment_notes || ''}
+                      onChange={(e) => setFormData({...formData, pay_adjustment_notes: e.target.value})}
+                      className="clay-button rounded-2xl border-0"
+                      placeholder="Reason for adjustment..."
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500">Pay Amount</p>
+                  <p className="text-xl font-bold text-gray-800">${formData.technician_pay?.toFixed(2) || '0.00'}</p>
+                </div>
+                {formData.pay_adjustment && formData.pay_adjustment !== 'none' && (
+                  <div>
+                    <Badge className="bg-blue-100 text-blue-700">
+                      {formData.pay_adjustment === 'extra_distance' && '+ Extra Distance'}
+                      {formData.pay_adjustment === 'half_pay' && 'Half Pay'}
+                      {formData.pay_adjustment === 'double_pay' && 'Double Pay'}
+                      {formData.pay_adjustment === 'custom' && 'Custom'}
+                    </Badge>
+                    {formData.pay_adjustment_notes && (
+                      <p className="text-xs text-gray-500 mt-1">{formData.pay_adjustment_notes}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Documents */}
           <div className="clay-card rounded-3xl p-6">
             <h3 className="text-lg font-bold text-indigo-600 flex items-center gap-2 mb-4">
