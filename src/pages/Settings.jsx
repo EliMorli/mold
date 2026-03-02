@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, DollarSign, Calendar, Microscope, Users, Plus, Search, Mail, Phone, Award, Clock, CheckCircle, Copy, Send } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, DollarSign, Calendar, Microscope, Users, Plus, Search, Mail, Phone, Award, Clock, CheckCircle, Copy, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

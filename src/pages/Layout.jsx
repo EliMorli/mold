@@ -8,23 +8,16 @@ import {
   FlaskConical,
   Users,
   Wrench,
-  Microscope,
   Receipt,
   Wallet,
   Calendar,
-  FileText,
-  Crown,
   Settings,
   Menu,
   X,
   MapIcon,
   LogOut,
   MessageSquare,
-  Zap,
   Search,
-  TrendingUp,
-  UserCog,
-  BarChart3,
   Target
 } from "lucide-react";
 import { useState, useEffect } from "react";
