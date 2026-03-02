@@ -32,7 +32,7 @@ import { createPageUrl } from "@/utils";
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("kpis");
   const [activeFilter, setActiveFilter] = useState("All Active");
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [timePeriod, setTimePeriod] = useState("Daily");
@@ -398,9 +398,9 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'kpis', label: 'KPIs', icon: BarChart3 },
+    { id: 'kpis', label: 'Overview', icon: BarChart3 },
     { id: 'daily', label: 'Daily Jobs', icon: List },
+    { id: 'overview', label: 'Jobs', icon: LayoutDashboard },
     { id: 'reports', label: 'Reports', icon: Download },
   ];
 
