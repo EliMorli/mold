@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Plus, Search, DollarSign, Check, Clock, X as XIcon, Upload } from "lucide-react";
+import { Plus, Search, DollarSign, Check, Clock, X as XIcon, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -241,16 +241,43 @@ export default function PaymentsPage() {
             </h1>
             <p className="text-gray-500 mt-1">{payments.length} total payments</p>
           </div>
-          <Button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="clay-button rounded-2xl px-6 py-3 flex items-center gap-2 font-semibold text-emerald-600 hover:scale-105"
-          >
-            <Plus className="w-5 h-5" />
-            Record Payment
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => {
+                // Export to CSV
+                const headers = ['Date', 'Client', 'Amount', 'Method', 'Status', 'Reference', 'Invoices'];
+                const rows = filteredPayments.map(p => [
+                  new Date(p.payment_date).toLocaleDateString(),
+                  p.client_name,
+                  p.amount.toFixed(2),
+                  p.payment_method,
+                  p.status,
+                  p.reference_number || p.check_number || '',
+                  (p.invoice_numbers || []).join('; ')
+                ]);
+                const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `payments_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+              }}
+              className="clay-button rounded-2xl px-6 py-3 flex items-center gap-2 font-semibold text-blue-600 hover:scale-105"
+            >
+              <Download className="w-5 h-5" />
+              Export CSV
+            </Button>
+            <Button
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+              className="clay-button rounded-2xl px-6 py-3 flex items-center gap-2 font-semibold text-emerald-600 hover:scale-105"
+            >
+              <Plus className="w-5 h-5" />
+              Record Payment
+            </Button>
+          </div>
         </div>
       </div>
 

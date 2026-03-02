@@ -8,46 +8,33 @@ import {
   FlaskConical,
   Users,
   Wrench,
-  Microscope,
   Receipt,
   Wallet,
   Calendar,
-  FileText,
-  Crown,
   Settings,
   Menu,
   X,
   MapIcon,
   LogOut,
   MessageSquare,
-  Zap,
   Search,
-  TrendingUp,
-  UserCog
+  Target
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/useAuth";
 
 const allNavigationItems = [
   { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard, access: "dashboard" },
-  { title: "My Portal", url: createPageUrl("ClientPortal"), icon: Users, access: "client-portal" },
-  { title: "Tests", url: createPageUrl("Tests"), icon: FlaskConical, access: "tests" },
+  { title: "Lead Tracking", url: createPageUrl("LeadTracking"), icon: Target, access: "clients" },
+  { title: "Jobs", url: createPageUrl("Tests"), icon: FlaskConical, access: "tests" },
   { title: "Clients", url: createPageUrl("Clients"), icon: Users, access: "clients" },
   { title: "Technicians", url: createPageUrl("Technicians"), icon: Wrench, access: "technicians" },
-  { title: "Performance", url: createPageUrl("TechnicianPerformance"), icon: TrendingUp, access: "technicians" },
-  { title: "Labs", url: createPageUrl("Labs"), icon: Microscope, access: "labs" },
   { title: "Invoices", url: createPageUrl("Invoices"), icon: Receipt, access: "invoices" },
   { title: "Payments", url: createPageUrl("Payments"), icon: Receipt, access: "payments" },
   { title: "Expenses", url: createPageUrl("Expenses"), icon: Wallet, access: "expenses" },
   { title: "Calendar", url: createPageUrl("Calendar"), icon: Calendar, access: "calendar" },
   { title: "Map", url: createPageUrl("Map"), icon: MapIcon, access: "map" },
-  { title: "Documents", url: createPageUrl("Documents"), icon: FileText, access: "documents" },
-  { title: "Reports", url: createPageUrl("Reports"), icon: FileText, access: "reports" },
-  { title: "Custom Reports", url: createPageUrl("CustomReports"), icon: FileText, access: "reports" },
-  { title: "Communications", url: createPageUrl("Communications"), icon: FileText, access: "communications" },
-  { title: "Automation", url: createPageUrl("Automation"), icon: Settings, access: "automation" },
-  { title: "Owner's View", url: createPageUrl("OwnerView"), icon: Crown, access: "owner-view" },
-  { title: "User Management", url: createPageUrl("Users"), icon: UserCog, access: "settings" },
+  { title: "Communications", url: createPageUrl("Communications"), icon: MessageSquare, access: "communications" },
   { title: "Settings", url: createPageUrl("Settings"), icon: Settings, access: "settings" },
 ];
 

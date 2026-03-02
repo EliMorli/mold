@@ -9,6 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { base44 } from "@/api/base44Client";
 
 export default function InvoiceModal({ invoice, clients, tests, onClose, onSave }) {
+  // Calculate default due date (30 days from today)
+  const getDefaultDueDate = () => {
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    return dueDate.toISOString().split('T')[0];
+  };
+
   const [formData, setFormData] = useState({
     invoice_number: '',
     client_id: '',
@@ -16,11 +23,11 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
     test_id: '',
     test_number: '',
     issue_date: new Date().toISOString().split('T')[0],
-    due_date: '',
+    due_date: invoice?.due_date || getDefaultDueDate(), // Auto-calculate 30 days from today
     amount: 0,
     tax: 0,
     total: 0,
-    amount_paid: 0, // ADDED
+    amount_paid: 0,
     status: 'Draft',
     payment_method: '',
     paid_date: '',

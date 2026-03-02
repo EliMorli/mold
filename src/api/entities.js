@@ -32,6 +32,12 @@ const DEMO_EXPENSES = [
   { id: '2', description: 'Gas', category: 'Travel', amount: 50, date: new Date().toISOString(), vendor: 'Shell' },
 ];
 
+const DEMO_LEADS = [
+  { id: '1', client_name: 'Mary Wilson', phone: '555-0401', email: 'mary@example.com', address: '321 Elm St, Miami FL', lead_source: 'Google', status: 'Follow Up', quote_amount: 450, created_date: new Date().toISOString() },
+  { id: '2', client_name: 'Tom Brown', phone: '555-0402', email: 'tom@example.com', address: '654 Cedar Ave, Tampa FL', lead_source: 'Referral', status: 'Scheduled', quote_amount: 600, amount: 600, invoice_sent: true, created_date: new Date().toISOString() },
+  { id: '3', client_name: 'Jane Davis', phone: '555-0403', email: 'jane@example.com', address: '987 Maple Dr, Orlando FL', lead_source: 'Website', status: 'Completed', quote_amount: 500, amount: 500, invoice_sent: true, in_reports: true, out_reports: true, paid: true, created_date: new Date().toISOString() },
+];
+
 // Create mock entity wrapper
 const createMockEntity = (demoData) => ({
   list: () => Promise.resolve(demoData),
@@ -51,6 +57,7 @@ export const Payment = DEMO_MODE ? createMockEntity([]) : base44.entities.Paymen
 export const Document = DEMO_MODE ? createMockEntity([]) : base44.entities.Document;
 export const Message = DEMO_MODE ? createMockEntity([]) : base44.entities.Message;
 export const AppSettings = DEMO_MODE ? createMockEntity([]) : base44.entities.AppSettings;
+export const Lead = DEMO_MODE ? createMockEntity(DEMO_LEADS) : base44.entities.Lead;
 
 // auth sdk:
 export const User = base44.auth;

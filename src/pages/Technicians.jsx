@@ -2,15 +2,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Plus, Search, Wrench, Mail, Phone, Award, Star } from "lucide-react";
+import { Plus, Search, Wrench, Mail, Phone, Award, Star, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createPageUrl } from "@/utils";
 import TechnicianModal from "../components/technicians/TechnicianModal";
 
 export default function TechniciansPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
   const [showModal, setShowModal] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState(null);
 
@@ -40,10 +42,15 @@ export default function TechniciansPage() {
     },
   });
 
-  const filteredTechnicians = technicians.filter(tech =>
-    tech.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tech.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTechnicians = technicians.filter(tech => {
+    const matchesSearch = tech.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tech.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === "All" || tech.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const activeCount = technicians.filter(t => t.status === 'Active').length;
+  const inactiveCount = technicians.filter(t => t.status === 'Inactive').length;
 
   const statusColors = {
     'Active': 'bg-green-100 text-green-700',
@@ -86,16 +93,32 @@ export default function TechniciansPage() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and Filter */}
       <div className="clay-card rounded-3xl p-6">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-400" />
-          <Input
-            placeholder="Search technicians..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-12 clay-button rounded-2xl border-0 h-12 text-gray-700"
-          />
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-400" />
+            <Input
+              placeholder="Search technicians..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-12 clay-button rounded-2xl border-0 h-12 text-gray-700"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-orange-400" />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="clay-button rounded-2xl border-0 w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All ({technicians.length})</SelectItem>
+                <SelectItem value="Active">Active ({activeCount})</SelectItem>
+                <SelectItem value="Inactive">Inactive ({inactiveCount})</SelectItem>
+                <SelectItem value="On Leave">On Leave</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

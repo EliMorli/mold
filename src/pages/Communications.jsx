@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { MessageSquare, Phone, Mail, Search, User, Calendar, Filter } from "lucide-react";
+import { MessageSquare, Phone, Mail, Search, User, Calendar, Filter, Plus, Send, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CommunicationsPage() {
@@ -11,6 +14,16 @@ export default function CommunicationsPage() {
   const [filterType, setFilterType] = useState("All");
   const [filterDirection, setFilterDirection] = useState("All");
   const [selectedConversation, setSelectedConversation] = useState(null);
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composeType, setComposeType] = useState("Email");
+  const [composeData, setComposeData] = useState({
+    client_id: '',
+    recipient: '',
+    subject: '',
+    content: ''
+  });
+
+  const queryClient = useQueryClient();
 
   const { data: messages = [] } = useQuery({
     queryKey: ['messages'],
@@ -113,15 +126,33 @@ export default function CommunicationsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="clay-card rounded-3xl p-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center shadow-inner">
-            <MessageSquare className="w-8 h-8 text-white" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center shadow-inner">
+              <MessageSquare className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">
+                Communications Center
+              </h1>
+              <p className="text-gray-500 mt-1">{messages.length} total messages across {conversationList.length} conversations</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">
-              Communications Center
-            </h1>
-            <p className="text-gray-500 mt-1">{messages.length} total messages across {conversationList.length} conversations</p>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => { setComposeType('Email'); setShowComposeModal(true); }}
+              className="clay-button rounded-2xl px-4 py-3 flex items-center gap-2 font-semibold text-purple-600 hover:scale-105"
+            >
+              <Mail className="w-5 h-5" />
+              New Email
+            </Button>
+            <Button
+              onClick={() => { setComposeType('SMS'); setShowComposeModal(true); }}
+              className="clay-button rounded-2xl px-4 py-3 flex items-center gap-2 font-semibold text-blue-600 hover:scale-105"
+            >
+              <MessageSquare className="w-5 h-5" />
+              New SMS
+            </Button>
           </div>
         </div>
       </div>
@@ -328,6 +359,110 @@ export default function CommunicationsPage() {
           </div>
         </div>
       </div>
+
+      {/* Compose Modal */}
+      {showComposeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div className="clay-card rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                New {composeType}
+              </h2>
+              <button
+                onClick={() => { setShowComposeModal(false); setComposeData({ client_id: '', recipient: '', subject: '', content: '' }); }}
+                className="clay-button rounded-2xl p-2 hover:scale-110 transition-transform"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              // Demo mode - just show alert
+              alert(`${composeType} would be sent to: ${composeData.recipient}\n\nSubject: ${composeData.subject}\n\nMessage: ${composeData.content}`);
+              setShowComposeModal(false);
+              setComposeData({ client_id: '', recipient: '', subject: '', content: '' });
+            }} className="space-y-6">
+              <div>
+                <Label className="text-gray-700 font-medium mb-2 block">Recipient (Client)</Label>
+                <Select value={composeData.client_id} onValueChange={(value) => {
+                  const client = clients.find(c => c.id === value);
+                  setComposeData({
+                    ...composeData,
+                    client_id: value,
+                    recipient: composeType === 'Email' ? client?.email : client?.phone
+                  });
+                }}>
+                  <SelectTrigger className="clay-button rounded-2xl border-0">
+                    <SelectValue placeholder="Select a client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map(client => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} - {composeType === 'Email' ? client.email : client.phone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-gray-700 font-medium mb-2 block">
+                  {composeType === 'Email' ? 'Email Address' : 'Phone Number'}
+                </Label>
+                <Input
+                  value={composeData.recipient}
+                  onChange={(e) => setComposeData({ ...composeData, recipient: e.target.value })}
+                  className="clay-button rounded-2xl border-0"
+                  placeholder={composeType === 'Email' ? 'email@example.com' : '+1 (555) 123-4567'}
+                  required
+                />
+              </div>
+
+              {composeType === 'Email' && (
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Subject</Label>
+                  <Input
+                    value={composeData.subject}
+                    onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
+                    className="clay-button rounded-2xl border-0"
+                    placeholder="Email subject..."
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label className="text-gray-700 font-medium mb-2 block">Message</Label>
+                <Textarea
+                  value={composeData.content}
+                  onChange={(e) => setComposeData({ ...composeData, content: e.target.value })}
+                  className="clay-button rounded-2xl border-0 min-h-[150px]"
+                  placeholder="Type your message..."
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button
+                  type="button"
+                  onClick={() => { setShowComposeModal(false); setComposeData({ client_id: '', recipient: '', subject: '', content: '' }); }}
+                  className="clay-button rounded-2xl px-6 py-3 font-medium text-gray-600"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Send {composeType}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
