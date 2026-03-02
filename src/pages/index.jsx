@@ -16,6 +16,10 @@ import CustomReports from "./CustomReports";
 
 import Dashboard from "./Dashboard";
 
+import DailyKPIs from "./DailyKPIs";
+
+import DailyJobView from "./DailyJobView";
+
 import Documents from "./Documents";
 
 import Expenses from "./Expenses";
@@ -25,6 +29,8 @@ import Home from "./Home";
 import Invoices from "./Invoices";
 
 import Labs from "./Labs";
+
+import LeadTracking from "./LeadTracking";
 
 import Map from "./Map";
 
@@ -53,49 +59,55 @@ import Verify from "./Verify";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
-    
+
     Automation: Automation,
-    
+
     Calendar: Calendar,
-    
+
     ClientPortal: ClientPortal,
-    
+
     ClientProfile: ClientProfile,
-    
+
     Clients: Clients,
-    
+
     Communications: Communications,
-    
+
     CustomReports: CustomReports,
-    
+
+    DailyKPIs: DailyKPIs,
+
+    DailyJobView: DailyJobView,
+
     Dashboard: Dashboard,
-    
+
     Documents: Documents,
-    
+
     Expenses: Expenses,
-    
+
     Home: Home,
-    
+
     Invoices: Invoices,
-    
+
     Labs: Labs,
-    
+
+    LeadTracking: LeadTracking,
+
     Map: Map,
-    
+
     OwnerView: OwnerView,
-    
+
     Payments: Payments,
-    
+
     Reports: Reports,
-    
+
     Settings: Settings,
-    
+
     TechnicianProfile: TechnicianProfile,
-    
+
     Technicians: Technicians,
-    
+
     TestProfile: TestProfile,
-    
+
     Tests: Tests,
 
     TechnicianPerformance: TechnicianPerformance,
@@ -143,6 +155,10 @@ function PagesContent() {
 
                 <Route path="/customreports" element={<CustomReports />} />
 
+                <Route path="/dailykpis" element={<DailyKPIs />} />
+
+                <Route path="/dailyjobview" element={<DailyJobView />} />
+
                 <Route path="/dashboard" element={<Dashboard />} />
 
                 <Route path="/documents" element={<Documents />} />
@@ -154,6 +170,8 @@ function PagesContent() {
                 <Route path="/invoices" element={<Invoices />} />
 
                 <Route path="/labs" element={<Labs />} />
+
+                <Route path="/leadtracking" element={<LeadTracking />} />
 
                 <Route path="/map" element={<Map />} />
 

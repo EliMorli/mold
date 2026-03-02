@@ -23,13 +23,18 @@ import {
   Zap,
   Search,
   TrendingUp,
-  UserCog
+  UserCog,
+  BarChart3,
+  Target
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/useAuth";
 
 const allNavigationItems = [
   { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard, access: "dashboard" },
+  { title: "Daily KPIs", url: createPageUrl("DailyKPIs"), icon: BarChart3, access: "dashboard" },
+  { title: "Daily Jobs", url: createPageUrl("DailyJobView"), icon: Calendar, access: "dashboard" },
+  { title: "Lead Tracking", url: createPageUrl("LeadTracking"), icon: Target, access: "clients" },
   { title: "My Portal", url: createPageUrl("ClientPortal"), icon: Users, access: "client-portal" },
   { title: "Tests", url: createPageUrl("Tests"), icon: FlaskConical, access: "tests" },
   { title: "Clients", url: createPageUrl("Clients"), icon: Users, access: "clients" },

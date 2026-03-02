@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 8;
+const DEMO_DATA_VERSION = 9;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -137,6 +137,29 @@ const INITIAL_EXPENSES = [
   { id: '18', description: 'Insurance premium', category: 'Other', amount: 850, date: daysAgo(30), vendor: 'State Farm', notes: 'General liability' },
 ];
 
+const INITIAL_LEADS = [
+  // Follow Up
+  { id: '1', client_name: 'Maria Garcia', phone: '305-555-4001', email: 'maria.garcia@gmail.com', address: '2300 Collins Ave Apt 502, Miami Beach FL 33139', lead_source: 'Google', status: 'Follow Up', quote_amount: 450, notes: 'Called back - interested but wants to schedule for next week', created_date: daysAgo(2) },
+  { id: '2', client_name: 'Robert Chen', phone: '954-555-4002', email: 'rchen@outlook.com', address: '1500 E Sunrise Blvd, Fort Lauderdale FL 33304', lead_source: 'Referral', status: 'Follow Up', quote_amount: 650, notes: 'Referred by Rodriguez Property Management', created_date: daysAgo(3) },
+
+  // Pending
+  { id: '3', client_name: 'Amanda Johnson', phone: '407-555-4003', email: 'ajohnson@yahoo.com', address: '4200 International Dr, Orlando FL 32819', lead_source: 'Website', status: 'Pending', quote_amount: 500, notes: 'Submitted form, waiting for callback confirmation', created_date: daysAgo(1) },
+  { id: '4', client_name: 'David Lee', phone: '561-555-4004', email: 'davidlee@icloud.com', address: '900 S Dixie Hwy, Boca Raton FL 33432', lead_source: 'Facebook', status: 'Pending', quote_amount: 400, notes: 'New condo purchase, needs inspection', created_date: daysAgo(0) },
+
+  // Scheduled
+  { id: '5', client_name: 'Patricia Moore', phone: '813-555-4005', email: 'pmoore@gmail.com', address: '3401 W Kennedy Blvd, Tampa FL 33609', lead_source: 'HomeAdvisor', status: 'Scheduled', quote_amount: 550, amount: 550, scheduled_date: daysFromNow(2), notes: 'Confirmed for Thursday 10am', created_date: daysAgo(5) },
+  { id: '6', client_name: 'William Turner', phone: '727-555-4006', email: 'wturner@hotmail.com', address: '2500 Drew St, Clearwater FL 33765', lead_source: 'Yelp', status: 'Scheduled', quote_amount: 480, amount: 480, scheduled_date: daysFromNow(4), notes: 'Scheduled for Saturday morning', created_date: daysAgo(4) },
+
+  // Completed
+  { id: '7', client_name: 'Jennifer Smith', phone: '305-555-4007', email: 'jsmith@email.com', address: '1800 Brickell Ave Unit 1205, Miami FL 33129', lead_source: 'Google', status: 'Completed', quote_amount: 600, amount: 600, invoice_number: 'INV-2025-010', invoice_sent: true, in_reports: true, out_reports: true, paid: true, notes: 'Completed successfully, positive mold found - referred to remediation', created_date: daysAgo(10) },
+  { id: '8', client_name: 'Michael Brown', phone: '954-555-4008', email: 'mbrown@gmail.com', address: '3000 E Commercial Blvd, Fort Lauderdale FL 33308', lead_source: 'Referral', status: 'Completed', quote_amount: 750, amount: 750, invoice_number: 'INV-2025-011', invoice_sent: true, in_reports: true, out_reports: true, paid: true, notes: 'Clearance test passed', created_date: daysAgo(14) },
+  { id: '9', client_name: 'Sarah Davis', phone: '407-555-4009', email: 'sdavis@outlook.com', address: '5600 Major Blvd, Orlando FL 32819', lead_source: 'Website', status: 'Completed', quote_amount: 520, amount: 520, invoice_number: 'INV-2025-012', invoice_sent: true, in_reports: true, out_reports: false, paid: false, notes: 'Test complete, awaiting report delivery', created_date: daysAgo(7) },
+
+  // Canceled
+  { id: '10', client_name: 'James Wilson', phone: '561-555-4010', email: 'jwilson2@gmail.com', address: '1200 S Federal Hwy, Delray Beach FL 33483', lead_source: 'Facebook', status: 'Canceled', quote_amount: 450, notes: 'Client decided to go with different company - price concern', created_date: daysAgo(8) },
+  { id: '11', client_name: 'Emily Anderson', phone: '786-555-4011', email: 'eanderson@yahoo.com', address: '7900 SW 104th St, Miami FL 33156', lead_source: 'Angi', status: 'Canceled', quote_amount: 580, notes: 'Property sale fell through', created_date: daysAgo(12) },
+];
+
 // Check and update demo data version - clears old data if version changed
 const checkDemoVersion = () => {
   try {
@@ -168,6 +191,7 @@ if (typeof window !== 'undefined') {
       clients: INITIAL_CLIENTS,
       invoices: INITIAL_INVOICES,
       expenses: INITIAL_EXPENSES,
+      leads: INITIAL_LEADS,
       users: INITIAL_USERS,
     };
 
@@ -248,6 +272,7 @@ const INITIAL_DATA_MAP = {
   labs: INITIAL_LABS,
   invoices: INITIAL_INVOICES,
   expenses: INITIAL_EXPENSES,
+  leads: INITIAL_LEADS,
   users: INITIAL_USERS,
   payments: [],
   documents: [],
@@ -316,6 +341,7 @@ const mockClient = {
     Lab: createMockEntity('labs'),
     Invoice: createMockEntity('invoices'),
     Expense: createMockEntity('expenses'),
+    Lead: createMockEntity('leads'),
     User: createMockEntity('users'),
     Payment: createMockEntity('payments'),
     Document: createMockEntity('documents'),
