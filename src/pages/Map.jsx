@@ -1,24 +1,52 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { MapPin, FlaskConical, Calendar, User, Filter, List, Map as MapIcon, Loader2 } from "lucide-react";
+import { MapPin, FlaskConical, Calendar, User, Filter, List, Map as MapIcon, Loader2, Search, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createPageUrl } from "@/utils";
 
 export default function MapPage() {
+  const queryClient = useQueryClient();
   const [selectedTest, setSelectedTest] = useState(null);
   const [statusFilter, setStatusFilter] = useState("active");
-  const [viewMode, setViewMode] = useState("list"); // "list" or "map"
+  const [viewMode, setViewMode] = useState("list");
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [droppedPin, setDroppedPin] = useState(null);
+  const [showNewJobForm, setShowNewJobForm] = useState(false);
+  const [saving, setSaving] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
+  const droppedPinMarkerRef = useRef(null);
   const geocoderRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+
+  const [newJobData, setNewJobData] = useState({
+    property_address: '',
+    client_name: '',
+    client_phone: '',
+    test_type: 'Air Quality',
+    test_category: 'Initial',
+    scheduled_date: '',
+    notes: ''
+  });
 
   const { data: tests = [], isLoading } = useQuery({
     queryKey: ['tests'],
     queryFn: () => base44.entities.Test.list('-scheduled_date'),
+    initialData: [],
+  });
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => base44.entities.Client.list(),
     initialData: [],
   });
 
@@ -61,18 +89,105 @@ export default function MapPage() {
       if (!mapRef.current || mapInstanceRef.current) return;
 
       mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+        center: { lat: 39.8283, lng: -98.5795 },
         zoom: 4,
         styles: [
           { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
         ]
       });
       geocoderRef.current = new window.google.maps.Geocoder();
+
+      // Add click listener to drop pin
+      mapInstanceRef.current.addListener('click', (e) => {
+        handleMapClick(e.latLng);
+      });
+
       setMapLoaded(true);
     };
 
     loadGoogleMaps();
   }, [viewMode]);
+
+  // Initialize search autocomplete
+  useEffect(() => {
+    if (!mapLoaded || !searchInputRef.current) return;
+
+    if (window.google && window.google.maps && window.google.maps.places) {
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        searchInputRef.current,
+        { types: ['address'], componentRestrictions: { country: 'us' } }
+      );
+
+      autocompleteRef.current.addListener('place_changed', () => {
+        const place = autocompleteRef.current.getPlace();
+        if (place.geometry) {
+          const location = place.geometry.location;
+          mapInstanceRef.current.setCenter(location);
+          mapInstanceRef.current.setZoom(16);
+
+          // Drop a pin at this location
+          handleMapClick(location, place.formatted_address);
+        }
+      });
+    }
+
+    return () => {
+      if (autocompleteRef.current && window.google && window.google.maps) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [mapLoaded]);
+
+  // Handle map click to drop pin
+  const handleMapClick = (latLng, address = null) => {
+    // Remove existing dropped pin
+    if (droppedPinMarkerRef.current) {
+      droppedPinMarkerRef.current.setMap(null);
+    }
+
+    // Create new dropped pin marker
+    droppedPinMarkerRef.current = new window.google.maps.Marker({
+      position: latLng,
+      map: mapInstanceRef.current,
+      draggable: true,
+      animation: window.google.maps.Animation.DROP,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 12,
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 3,
+      }
+    });
+
+    // Update position when dragged
+    droppedPinMarkerRef.current.addListener('dragend', (e) => {
+      reverseGeocode(e.latLng);
+    });
+
+    if (address) {
+      setDroppedPin({ lat: latLng.lat(), lng: latLng.lng(), address });
+      setNewJobData(prev => ({ ...prev, property_address: address }));
+      setShowNewJobForm(true);
+    } else {
+      reverseGeocode(latLng);
+    }
+  };
+
+  // Reverse geocode to get address from coordinates
+  const reverseGeocode = (latLng) => {
+    if (!geocoderRef.current) return;
+
+    geocoderRef.current.geocode({ location: latLng }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        const address = results[0].formatted_address;
+        setDroppedPin({ lat: latLng.lat(), lng: latLng.lng(), address });
+        setNewJobData(prev => ({ ...prev, property_address: address }));
+        setShowNewJobForm(true);
+      }
+    });
+  };
 
   // Add markers when map is loaded and tests change
   useEffect(() => {
@@ -138,6 +253,71 @@ export default function MapPage() {
       });
     });
   }, [mapLoaded, filteredTests]);
+
+  const handleCreateJob = async () => {
+    setSaving(true);
+    try {
+      // Generate test number
+      const allTests = await base44.entities.Test.list();
+      const currentYear = new Date().getFullYear();
+      const yearPrefix = `T-${currentYear}-`;
+      const currentYearTests = allTests
+        .filter(t => t.test_number && t.test_number.startsWith(yearPrefix))
+        .map(t => {
+          const parts = t.test_number.split('-');
+          return parseInt(parts[2]) || 0;
+        });
+      const maxNumber = currentYearTests.length > 0 ? Math.max(...currentYearTests) : 0;
+      const nextNumber = maxNumber + 1;
+      const testNumber = `T-${currentYear}-${String(nextNumber).padStart(3, '0')}`;
+
+      const newTest = {
+        test_number: testNumber,
+        property_address: newJobData.property_address,
+        client_name: newJobData.client_name,
+        client_phone: newJobData.client_phone,
+        test_type: newJobData.test_type,
+        test_category: newJobData.test_category,
+        scheduled_date: newJobData.scheduled_date,
+        notes: newJobData.notes,
+        status: 'Scheduled',
+        results: 'Pending'
+      };
+
+      await base44.entities.Test.create(newTest);
+      queryClient.invalidateQueries({ queryKey: ['tests'] });
+
+      // Reset form
+      setShowNewJobForm(false);
+      setDroppedPin(null);
+      if (droppedPinMarkerRef.current) {
+        droppedPinMarkerRef.current.setMap(null);
+        droppedPinMarkerRef.current = null;
+      }
+      setNewJobData({
+        property_address: '',
+        client_name: '',
+        client_phone: '',
+        test_type: 'Air Quality',
+        test_category: 'Initial',
+        scheduled_date: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Error creating job:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelNewJob = () => {
+    setShowNewJobForm(false);
+    setDroppedPin(null);
+    if (droppedPinMarkerRef.current) {
+      droppedPinMarkerRef.current.setMap(null);
+      droppedPinMarkerRef.current = null;
+    }
+  };
 
   const statusColors = {
     'Scheduled': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -232,14 +412,168 @@ export default function MapPage() {
             </div>
           ) : (
             <div className="relative">
+              {/* Search Bar */}
+              <div className="absolute top-4 left-4 right-4 z-20 flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search address to drop a pin..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border-0 shadow-lg bg-white/95 backdrop-blur-sm focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Map Instructions */}
+              <div className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-sm rounded-xl px-4 py-2 shadow-lg">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-cyan-600">Tip:</span> Click anywhere on the map to drop a pin and create a new job
+                </p>
+              </div>
+
               {!mapLoaded && (
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl flex items-center justify-center z-10">
                   <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
                 </div>
               )}
-              <div ref={mapRef} className="rounded-2xl h-96 w-full" />
+              <div ref={mapRef} className="rounded-2xl h-[500px] w-full" />
+
+              {/* New Job Form Panel */}
+              {showNewJobForm && (
+                <div className="absolute top-4 right-4 z-30 w-80 bg-white rounded-2xl shadow-xl p-5 max-h-[460px] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <Plus className="w-5 h-5 text-cyan-500" />
+                      New Job
+                    </h3>
+                    <button onClick={cancelNewJob} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm text-gray-600">Address</Label>
+                      <Input
+                        value={newJobData.property_address}
+                        onChange={(e) => setNewJobData(prev => ({ ...prev, property_address: e.target.value }))}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Client Name</Label>
+                      <Input
+                        value={newJobData.client_name}
+                        onChange={(e) => setNewJobData(prev => ({ ...prev, client_name: e.target.value }))}
+                        placeholder="Enter client name"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Client Phone</Label>
+                      <Input
+                        value={newJobData.client_phone}
+                        onChange={(e) => setNewJobData(prev => ({ ...prev, client_phone: e.target.value }))}
+                        placeholder="(555) 123-4567"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Test Type</Label>
+                      <Select
+                        value={newJobData.test_type}
+                        onValueChange={(val) => setNewJobData(prev => ({ ...prev, test_type: val }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Air Quality">Air Quality</SelectItem>
+                          <SelectItem value="Surface">Surface</SelectItem>
+                          <SelectItem value="Bulk">Bulk</SelectItem>
+                          <SelectItem value="Tape Lift">Tape Lift</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Test Category</Label>
+                      <Select
+                        value={newJobData.test_category}
+                        onValueChange={(val) => setNewJobData(prev => ({ ...prev, test_category: val }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Initial">Initial</SelectItem>
+                          <SelectItem value="Post-Remediation">Post-Remediation</SelectItem>
+                          <SelectItem value="Follow-up">Follow-up</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Scheduled Date</Label>
+                      <Input
+                        type="datetime-local"
+                        value={newJobData.scheduled_date}
+                        onChange={(e) => setNewJobData(prev => ({ ...prev, scheduled_date: e.target.value }))}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-gray-600">Notes</Label>
+                      <Input
+                        value={newJobData.notes}
+                        onChange={(e) => setNewJobData(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Any special instructions..."
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleCreateJob}
+                      disabled={saving || !newJobData.property_address}
+                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                    >
+                      {saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      Create Job
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Legend */}
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-blue-500" />
+              <span className="text-gray-600">Scheduled</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-purple-500" />
+              <span className="text-gray-600">In Progress</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-500" />
+              <span className="text-gray-600">Completed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-red-500" />
+              <span className="text-gray-600">Dropped Pin</span>
+            </div>
+          </div>
         </div>
       ) : (
         /* List View */
