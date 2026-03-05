@@ -25,33 +25,28 @@ export default function LabModal({ lab, onClose, onSave }) {
   const autocompleteRef = useRef(null);
 
   useEffect(() => {
-    const loadGoogleMaps = async () => {
-      try {
-        const response = await base44.functions.invoke('getGoogleMapsKey', {});
-        const { apiKey } = response.data;
+    const loadGoogleMaps = () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-        if (!apiKey) {
-          console.error('Google Maps API key not available');
-          return;
-        }
-
-        if (window.google && window.google.maps && window.google.maps.places) {
-          initAutocomplete();
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => initAutocomplete();
-        script.onerror = () => {
-          console.error('Failed to load Google Maps script');
-        };
-        document.head.appendChild(script);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
+      if (!apiKey) {
+        console.error('Google Maps API key not configured');
+        return;
       }
+
+      if (window.google && window.google.maps && window.google.maps.places) {
+        initAutocomplete();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => initAutocomplete();
+      script.onerror = () => {
+        console.error('Failed to load Google Maps script');
+      };
+      document.head.appendChild(script);
     };
 
     const initAutocomplete = () => {

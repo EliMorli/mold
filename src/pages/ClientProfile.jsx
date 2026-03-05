@@ -73,27 +73,25 @@ export default function ClientProfilePage() {
 
   // Google Maps autocomplete
   useEffect(() => {
-    const loadGoogleMaps = async () => {
-      try {
-        const response = await base44.functions.invoke('getGoogleMapsKey', {});
-        const { apiKey } = response.data;
+    const loadGoogleMaps = () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-        if (!apiKey) return;
-
-        if (window.google && window.google.maps && window.google.maps.places) {
-          initAutocomplete();
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => initAutocomplete();
-        document.head.appendChild(script);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
+      if (!apiKey) {
+        console.error('Google Maps API key not configured');
+        return;
       }
+
+      if (window.google && window.google.maps && window.google.maps.places) {
+        initAutocomplete();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => initAutocomplete();
+      document.head.appendChild(script);
     };
 
     const initAutocomplete = () => {

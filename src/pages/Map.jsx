@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { MapPin, FlaskConical, Calendar, User, Filter, List, Map as MapIcon } from "lucide-react";
+import { MapPin, FlaskConical, Calendar, User, Filter, List, Map as MapIcon, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createPageUrl } from "@/utils";
 
@@ -9,6 +9,12 @@ export default function MapPage() {
   const [selectedTest, setSelectedTest] = useState(null);
   const [statusFilter, setStatusFilter] = useState("active");
   const [viewMode, setViewMode] = useState("list"); // "list" or "map"
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState(null);
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+  const geocoderRef = useRef(null);
 
   const { data: tests = [], isLoading } = useQuery({
     queryKey: ['tests'],
@@ -25,6 +31,113 @@ export default function MapPage() {
     }
     return true;
   });
+
+  // Load Google Maps
+  useEffect(() => {
+    if (viewMode !== "map") return;
+
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setMapError("Google Maps API key not configured");
+      return;
+    }
+
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        initMap();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => initMap();
+      script.onerror = () => setMapError("Failed to load Google Maps");
+      document.head.appendChild(script);
+    };
+
+    const initMap = () => {
+      if (!mapRef.current || mapInstanceRef.current) return;
+
+      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+        center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+        zoom: 4,
+        styles: [
+          { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
+        ]
+      });
+      geocoderRef.current = new window.google.maps.Geocoder();
+      setMapLoaded(true);
+    };
+
+    loadGoogleMaps();
+  }, [viewMode]);
+
+  // Add markers when map is loaded and tests change
+  useEffect(() => {
+    if (!mapLoaded || !mapInstanceRef.current || !geocoderRef.current) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasValidLocations = false;
+
+    filteredTests.forEach(test => {
+      if (!test.property_address) return;
+
+      geocoderRef.current.geocode({ address: test.property_address }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          const location = results[0].geometry.location;
+          hasValidLocations = true;
+
+          const marker = new window.google.maps.Marker({
+            position: location,
+            map: mapInstanceRef.current,
+            title: test.property_address,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: test.status === 'Completed' ? '#22c55e' :
+                         test.status === 'In Progress' ? '#a855f7' : '#3b82f6',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            }
+          });
+
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `
+              <div style="padding: 8px; max-width: 200px;">
+                <strong>${test.test_number}</strong><br/>
+                <span style="color: #666;">${test.property_address}</span><br/>
+                <span style="color: #666;">${test.client_name || ''}</span><br/>
+                <a href="${createPageUrl('TestProfile')}?id=${test.id}" style="color: #0891b2; text-decoration: underline;">View Details</a>
+              </div>
+            `
+          });
+
+          marker.addListener('click', () => {
+            infoWindow.open(mapInstanceRef.current, marker);
+          });
+
+          markersRef.current.push(marker);
+          bounds.extend(location);
+
+          if (markersRef.current.length === filteredTests.filter(t => t.property_address).length) {
+            if (hasValidLocations && markersRef.current.length > 0) {
+              mapInstanceRef.current.fitBounds(bounds);
+              if (markersRef.current.length === 1) {
+                mapInstanceRef.current.setZoom(14);
+              }
+            }
+          }
+        }
+      });
+    });
+  }, [mapLoaded, filteredTests]);
 
   const statusColors = {
     'Scheduled': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -107,15 +220,26 @@ export default function MapPage() {
       </div>
 
       {viewMode === "map" ? (
-        /* Map View - Placeholder */
+        /* Map View */
         <div className="clay-card rounded-3xl p-6">
-          <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl h-96 flex items-center justify-center">
-            <div className="text-center">
-              <MapIcon className="w-16 h-16 text-cyan-300 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-700 mb-2">Map View</h3>
-              <p className="text-gray-500">Configure Google Maps API key in settings to enable map view</p>
+          {mapError ? (
+            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl h-96 flex items-center justify-center">
+              <div className="text-center">
+                <MapIcon className="w-16 h-16 text-cyan-300 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-gray-700 mb-2">Map Unavailable</h3>
+                <p className="text-gray-500">{mapError}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative">
+              {!mapLoaded && (
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl flex items-center justify-center z-10">
+                  <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                </div>
+              )}
+              <div ref={mapRef} className="rounded-2xl h-96 w-full" />
+            </div>
+          )}
         </div>
       ) : (
         /* List View */
