@@ -22,6 +22,16 @@ export default function MapPage() {
     initialData: [],
   });
 
+  const filteredTests = tests.filter(test => {
+    if (statusFilter === "active") {
+      return test.status === 'Scheduled' || test.status === 'In Progress';
+    }
+    if (statusFilter === "completed") {
+      return test.status === 'Completed';
+    }
+    return true;
+  });
+
   // Load Google Maps
   useEffect(() => {
     if (viewMode !== "map") return;
@@ -128,16 +138,6 @@ export default function MapPage() {
       });
     });
   }, [mapLoaded, filteredTests]);
-
-  const filteredTests = tests.filter(test => {
-    if (statusFilter === "active") {
-      return test.status === 'Scheduled' || test.status === 'In Progress';
-    }
-    if (statusFilter === "completed") {
-      return test.status === 'Completed';
-    }
-    return true;
-  });
 
   const statusColors = {
     'Scheduled': 'bg-blue-100 text-blue-700 border-blue-200',
