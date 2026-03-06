@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
@@ -29,6 +29,9 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState("month"); // day, week, month
   const [searchAddress, setSearchAddress] = useState("");
   const [showFindTech, setShowFindTech] = useState(false);
+
+  const addressInputRef = useRef(null);
+  const autocompleteRef = useRef(null);
 
   const queryClient = useQueryClient();
 
@@ -70,6 +73,88 @@ export default function CalendarPage() {
       setSelectedTest(null);
     },
   });
+
+  // Google Maps autocomplete for Find Nearest Tech
+  useEffect(() => {
+    if (!showFindTech) return;
+
+    let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const initAutocomplete = () => {
+      if (!mounted) return;
+      if (!addressInputRef.current) {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(initAutocomplete, 100);
+        }
+        return;
+      }
+      if (autocompleteRef.current) return;
+
+      try {
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(
+          addressInputRef.current,
+          {
+            types: ['address'],
+            componentRestrictions: { country: 'us' }
+          }
+        );
+
+        autocompleteRef.current.addListener('place_changed', () => {
+          const place = autocompleteRef.current.getPlace();
+          if (place.formatted_address) {
+            setSearchAddress(place.formatted_address);
+          }
+        });
+      } catch (error) {
+        console.error('Error initializing autocomplete:', error);
+      }
+    };
+
+    const loadGoogleMaps = () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+      if (!apiKey) {
+        console.error('Google Maps API key not configured');
+        return;
+      }
+
+      if (window.google && window.google.maps && window.google.maps.places) {
+        initAutocomplete();
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (existingScript) {
+        if (window.google && window.google.maps) {
+          initAutocomplete();
+        } else {
+          existingScript.addEventListener('load', initAutocomplete);
+        }
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => initAutocomplete();
+      document.head.appendChild(script);
+    };
+
+    const timeoutId = setTimeout(loadGoogleMaps, 100);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+      if (autocompleteRef.current && window.google && window.google.maps && window.google.maps.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, [showFindTech]);
 
   // Filter tests by technician
   const filteredTests = filterTechnician === "All"
@@ -307,10 +392,12 @@ export default function CalendarPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
               <Input
+                ref={addressInputRef}
                 placeholder="Enter job address to find nearest tech..."
                 value={searchAddress}
                 onChange={(e) => setSearchAddress(e.target.value)}
                 className="pl-12 clay-button rounded-2xl border-0 h-12 text-gray-700"
+                autoComplete="off"
               />
             </div>
             <Button
