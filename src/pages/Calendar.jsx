@@ -403,6 +403,25 @@ export default function CalendarPage() {
             <Button
               className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105"
               disabled={!searchAddress}
+              onClick={() => {
+                // For now, show technicians with their job counts for today
+                // A full implementation would use Google Distance Matrix API
+                const todayTests = getTestsForDay(new Date());
+                const techJobCounts = assignableTechnicians.map(tech => {
+                  const techTests = todayTests.filter(t => t.technician_id === tech.id);
+                  return { tech, jobCount: techTests.length };
+                });
+
+                // Sort by fewest jobs (most available)
+                techJobCounts.sort((a, b) => a.jobCount - b.jobCount);
+
+                const recommended = techJobCounts[0];
+                if (recommended) {
+                  alert(`Recommended Technician for "${searchAddress}":\n\n${recommended.tech.name}\nCurrent jobs today: ${recommended.jobCount}\n\nThis technician has the lightest workload.`);
+                } else {
+                  alert('No technicians available for assignment.');
+                }
+              }}
             >
               <MapPin className="w-4 h-4 mr-2" />
               Drop Pin & Find
