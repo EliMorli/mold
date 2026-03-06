@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { Test, Client, Technician, Lab, Invoice } from "@/api/entities";
 import {
   Calendar as CalendarIcon,
   FlaskConical,
@@ -39,36 +40,36 @@ export default function CalendarPage() {
 
   const { data: tests = [] } = useQuery({
     queryKey: ['tests'],
-    queryFn: () => base44.entities.Test.list(),
+    queryFn: () => Test.list(),
     initialData: [],
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list(),
+    queryFn: () => Client.list(),
     initialData: [],
   });
 
   const { data: technicians = [] } = useQuery({
     queryKey: ['technicians'],
-    queryFn: () => base44.entities.Technician.list(),
+    queryFn: () => Technician.list(),
     initialData: [],
   });
 
   const { data: labs = [] } = useQuery({
     queryKey: ['labs'],
-    queryFn: () => base44.entities.Lab.list(),
+    queryFn: () => Lab.list(),
     initialData: [],
   });
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => base44.entities.Invoice.list(),
+    queryFn: () => Invoice.list(),
     initialData: [],
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Test.update(id, data),
+    mutationFn: ({ id, data }) => Test.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['tests']);
       setShowModal(false);
@@ -505,39 +506,43 @@ export default function CalendarPage() {
                 </button>
               </div>
               <div className="space-y-2">
-                {techSearchResults.map((result, idx) => (
-                  <div
-                    key={result.tech.id}
-                    className={`clay-button rounded-xl p-3 flex items-center gap-3 ${idx === 0 ? 'ring-2 ring-green-400' : ''}`}
-                  >
-                    <div className={`w-8 h-8 rounded-full ${colorMap[result.tech.color_code]} flex items-center justify-center text-white font-bold`}>
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800">{result.tech.name}</span>
-                        {idx === 0 && <Badge className="bg-green-100 text-green-700 text-xs">Recommended</Badge>}
+                {techSearchResults.length === 0 ? (
+                  <p className="text-gray-500 text-sm py-4 text-center">No technicians available for assignment. Check that technicians have "can_be_assigned_jobs" enabled.</p>
+                ) : (
+                  techSearchResults.map((result, idx) => (
+                    <div
+                      key={result.tech.id}
+                      className={`clay-button rounded-xl p-3 flex items-center gap-3 ${idx === 0 ? 'ring-2 ring-green-400' : ''}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full ${colorMap[result.tech.color_code]} flex items-center justify-center text-white font-bold`}>
+                        {idx + 1}
                       </div>
-                      <p className="text-xs text-gray-500">
-                        {result.locationSource}: {result.currentLocation?.substring(0, 40)}...
-                      </p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-800">{result.tech.name}</span>
+                          {idx === 0 && <Badge className="bg-green-100 text-green-700 text-xs">Recommended</Badge>}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {result.locationSource}: {result.currentLocation?.substring(0, 40)}...
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {result.duration !== 'N/A' ? (
+                          <>
+                            <p className="font-bold text-purple-600">{result.duration}</p>
+                            <p className="text-xs text-gray-500">{result.distance}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-500">{result.jobCount} jobs today</p>
+                        )}
+                      </div>
+                      <div className="text-center border-l pl-3">
+                        <p className="text-lg font-bold text-gray-700">{result.upcomingJobs}</p>
+                        <p className="text-xs text-gray-400">upcoming</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      {result.duration !== 'N/A' ? (
-                        <>
-                          <p className="font-bold text-purple-600">{result.duration}</p>
-                          <p className="text-xs text-gray-500">{result.distance}</p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-gray-500">{result.jobCount} jobs today</p>
-                      )}
-                    </div>
-                    <div className="text-center border-l pl-3">
-                      <p className="text-lg font-bold text-gray-700">{result.upcomingJobs}</p>
-                      <p className="text-xs text-gray-400">upcoming</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
