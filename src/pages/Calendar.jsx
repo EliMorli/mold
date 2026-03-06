@@ -29,6 +29,8 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState("month"); // day, week, month
   const [searchAddress, setSearchAddress] = useState("");
   const [showFindTech, setShowFindTech] = useState(false);
+  const [techSearchResults, setTechSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const addressInputRef = useRef(null);
   const autocompleteRef = useRef(null);
@@ -402,50 +404,164 @@ export default function CalendarPage() {
             </div>
             <Button
               className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105"
-              disabled={!searchAddress}
-              onClick={() => {
-                // For now, show technicians with their job counts for today
-                // A full implementation would use Google Distance Matrix API
+              disabled={!searchAddress || isSearching}
+              onClick={async () => {
+                setIsSearching(true);
                 const todayTests = getTestsForDay(new Date());
-                const techJobCounts = assignableTechnicians.map(tech => {
-                  const techTests = todayTests.filter(t => t.technician_id === tech.id);
-                  return { tech, jobCount: techTests.length };
+
+                // Build technician data with their current/next location
+                const techData = assignableTechnicians.map(tech => {
+                  const techTests = todayTests
+                    .filter(t => t.technician_id === tech.id)
+                    .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date));
+
+                  // Get current location: last completed job, or next scheduled, or home
+                  const now = new Date();
+                  const completedJobs = techTests.filter(t => new Date(t.scheduled_date) < now);
+                  const upcomingJobs = techTests.filter(t => new Date(t.scheduled_date) >= now);
+
+                  let currentLocation = tech.home_address || 'Miami, FL';
+                  let locationSource = 'Home';
+
+                  if (completedJobs.length > 0) {
+                    currentLocation = completedJobs[completedJobs.length - 1].property_address;
+                    locationSource = 'Last Job';
+                  } else if (upcomingJobs.length > 0) {
+                    currentLocation = upcomingJobs[0].property_address;
+                    locationSource = 'Next Job';
+                  }
+
+                  return {
+                    tech,
+                    jobCount: techTests.length,
+                    currentLocation,
+                    locationSource,
+                    upcomingJobs: upcomingJobs.length
+                  };
                 });
 
-                // Sort by fewest jobs (most available)
-                techJobCounts.sort((a, b) => a.jobCount - b.jobCount);
+                // Try Google Distance Matrix API
+                if (window.google?.maps?.DistanceMatrixService) {
+                  try {
+                    const service = new window.google.maps.DistanceMatrixService();
+                    const origins = techData.map(t => t.currentLocation);
 
-                const recommended = techJobCounts[0];
-                if (recommended) {
-                  alert(`Recommended Technician for "${searchAddress}":\n\n${recommended.tech.name}\nCurrent jobs today: ${recommended.jobCount}\n\nThis technician has the lightest workload.`);
+                    const response = await new Promise((resolve, reject) => {
+                      service.getDistanceMatrix({
+                        origins,
+                        destinations: [searchAddress],
+                        travelMode: 'DRIVING',
+                        unitSystem: window.google.maps.UnitSystem.IMPERIAL
+                      }, (result, status) => {
+                        if (status === 'OK') resolve(result);
+                        else reject(status);
+                      });
+                    });
+
+                    // Add distance data to tech results
+                    const resultsWithDistance = techData.map((t, idx) => {
+                      const element = response.rows[idx]?.elements[0];
+                      return {
+                        ...t,
+                        distance: element?.distance?.text || 'N/A',
+                        distanceValue: element?.distance?.value || 999999,
+                        duration: element?.duration?.text || 'N/A',
+                        durationValue: element?.duration?.value || 999999
+                      };
+                    });
+
+                    // Sort by travel time
+                    resultsWithDistance.sort((a, b) => a.durationValue - b.durationValue);
+                    setTechSearchResults(resultsWithDistance);
+                  } catch (err) {
+                    console.error('Distance Matrix error:', err);
+                    // Fallback to workload-based
+                    techData.sort((a, b) => a.jobCount - b.jobCount);
+                    setTechSearchResults(techData.map(t => ({ ...t, distance: 'N/A', duration: 'N/A' })));
+                  }
                 } else {
-                  alert('No technicians available for assignment.');
+                  // No Google Maps - sort by workload
+                  techData.sort((a, b) => a.jobCount - b.jobCount);
+                  setTechSearchResults(techData.map(t => ({ ...t, distance: 'N/A', duration: 'N/A' })));
                 }
+                setIsSearching(false);
               }}
             >
               <MapPin className="w-4 h-4 mr-2" />
-              Drop Pin & Find
+              {isSearching ? 'Searching...' : 'Drop Pin & Find'}
             </Button>
           </div>
 
-          {/* Tech Location Legend */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500 mb-3">Today's technician locations:</p>
-            <div className="flex flex-wrap gap-3">
-              {assignableTechnicians.map((tech, idx) => {
-                const techTests = getTestsForDay(new Date()).filter(t => t.technician_id === tech.id);
-                return (
-                  <div key={tech.id} className="clay-button rounded-xl px-3 py-2 flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full ${colorMap[tech.color_code]} flex items-center justify-center text-white text-xs font-bold`}>
-                      {String.fromCharCode(65 + idx)}
+          {/* Search Results */}
+          {techSearchResults && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-gray-700">Recommended Technicians for: <span className="text-purple-600">{searchAddress}</span></p>
+                <button
+                  onClick={() => setTechSearchResults(null)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="space-y-2">
+                {techSearchResults.map((result, idx) => (
+                  <div
+                    key={result.tech.id}
+                    className={`clay-button rounded-xl p-3 flex items-center gap-3 ${idx === 0 ? 'ring-2 ring-green-400' : ''}`}
+                  >
+                    <div className={`w-8 h-8 rounded-full ${colorMap[result.tech.color_code]} flex items-center justify-center text-white font-bold`}>
+                      {idx + 1}
                     </div>
-                    <span className="text-sm font-medium text-gray-700">{tech.name}</span>
-                    <Badge className="bg-gray-100 text-gray-600 text-xs">{techTests.length} jobs</Badge>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-800">{result.tech.name}</span>
+                        {idx === 0 && <Badge className="bg-green-100 text-green-700 text-xs">Recommended</Badge>}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {result.locationSource}: {result.currentLocation?.substring(0, 40)}...
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      {result.duration !== 'N/A' ? (
+                        <>
+                          <p className="font-bold text-purple-600">{result.duration}</p>
+                          <p className="text-xs text-gray-500">{result.distance}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-500">{result.jobCount} jobs today</p>
+                      )}
+                    </div>
+                    <div className="text-center border-l pl-3">
+                      <p className="text-lg font-bold text-gray-700">{result.upcomingJobs}</p>
+                      <p className="text-xs text-gray-400">upcoming</p>
+                    </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Tech Location Legend */}
+          {!techSearchResults && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-500 mb-3">Today's technician locations:</p>
+              <div className="flex flex-wrap gap-3">
+                {assignableTechnicians.map((tech, idx) => {
+                  const techTests = getTestsForDay(new Date()).filter(t => t.technician_id === tech.id);
+                  return (
+                    <div key={tech.id} className="clay-button rounded-xl px-3 py-2 flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full ${colorMap[tech.color_code]} flex items-center justify-center text-white text-xs font-bold`}>
+                        {String.fromCharCode(65 + idx)}
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">{tech.name}</span>
+                      <Badge className="bg-gray-100 text-gray-600 text-xs">{techTests.length} jobs</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

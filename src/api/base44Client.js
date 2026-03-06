@@ -5,7 +5,7 @@ import { createClient } from '@base44/sdk';
 export const DEMO_MODE = true;
 
 // Version for demo data - increment this to force refresh localStorage
-const DEMO_DATA_VERSION = 9;
+const DEMO_DATA_VERSION = 10;
 
 // Helper to create dates relative to today
 const daysAgo = (days) => {
@@ -40,11 +40,11 @@ const INITIAL_CLIENTS = [
 ];
 
 const INITIAL_TECHNICIANS = [
-  { id: '1', name: 'Marcus Johnson', email: 'marcus.j@johnmold.com', phone: '305-555-2001', status: 'Active', color_code: 'Blue', permission_level: 'Senior Technician', completed_tests: 156, rating: 4.9, can_be_assigned_jobs: true, certification: 'ACAC Certified', hire_date: '2021-03-15' },
-  { id: '2', name: 'Elena Rodriguez', email: 'elena.r@johnmold.com', phone: '305-555-2002', status: 'Active', color_code: 'Pink', permission_level: 'Technician', completed_tests: 89, rating: 4.8, can_be_assigned_jobs: true, certification: 'IICRC Certified', hire_date: '2022-06-01' },
-  { id: '3', name: 'James Cooper', email: 'james.c@johnmold.com', phone: '305-555-2003', status: 'Active', color_code: 'Green', permission_level: 'Technician', completed_tests: 67, rating: 4.7, can_be_assigned_jobs: true, certification: 'ACAC Certified', hire_date: '2022-09-15' },
-  { id: '4', name: 'Sophia Chen', email: 'sophia.c@johnmold.com', phone: '305-555-2004', status: 'Active', color_code: 'Purple', permission_level: 'Junior Technician', completed_tests: 34, rating: 4.6, can_be_assigned_jobs: true, certification: 'In Training', hire_date: '2023-08-01' },
-  { id: '5', name: 'David Williams', email: 'david.w@johnmold.com', phone: '305-555-2005', status: 'On Leave', color_code: 'Orange', permission_level: 'Senior Technician', completed_tests: 201, rating: 4.9, can_be_assigned_jobs: false, certification: 'ACAC & IICRC Certified', hire_date: '2020-01-10' },
+  { id: '1', name: 'Marcus Johnson', email: 'marcus.j@johnmold.com', phone: '305-555-2001', status: 'Active', color_code: 'Blue', permission_level: 'Senior Technician', completed_tests: 156, rating: 4.9, can_be_assigned_jobs: true, certification: 'ACAC Certified', hire_date: '2021-03-15', home_address: '1500 NW 7th St, Miami FL 33125' },
+  { id: '2', name: 'Elena Rodriguez', email: 'elena.r@johnmold.com', phone: '305-555-2002', status: 'Active', color_code: 'Pink', permission_level: 'Technician', completed_tests: 89, rating: 4.8, can_be_assigned_jobs: true, certification: 'IICRC Certified', hire_date: '2022-06-01', home_address: '3200 SW 22nd Ter, Miami FL 33145' },
+  { id: '3', name: 'James Cooper', email: 'james.c@johnmold.com', phone: '305-555-2003', status: 'Active', color_code: 'Green', permission_level: 'Technician', completed_tests: 67, rating: 4.7, can_be_assigned_jobs: true, certification: 'ACAC Certified', hire_date: '2022-09-15', home_address: '8500 NW 186th St, Hialeah FL 33015' },
+  { id: '4', name: 'Sophia Chen', email: 'sophia.c@johnmold.com', phone: '305-555-2004', status: 'Active', color_code: 'Purple', permission_level: 'Junior Technician', completed_tests: 34, rating: 4.6, can_be_assigned_jobs: true, certification: 'In Training', hire_date: '2023-08-01', home_address: '500 Brickell Key Dr, Miami FL 33131' },
+  { id: '5', name: 'David Williams', email: 'david.w@johnmold.com', phone: '305-555-2005', status: 'On Leave', color_code: 'Orange', permission_level: 'Senior Technician', completed_tests: 201, rating: 4.9, can_be_assigned_jobs: false, certification: 'ACAC & IICRC Certified', hire_date: '2020-01-10', home_address: '2000 S Dixie Hwy, Coral Gables FL 33146' },
 ];
 
 const INITIAL_LABS = [
