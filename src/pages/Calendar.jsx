@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Test, Client, Technician, Lab, Invoice } from "@/api/entities";
+import { Test, Client, Technician, Lab, Invoice, Lead } from "@/api/entities";
 import {
   Calendar as CalendarIcon,
   FlaskConical,
@@ -13,7 +13,9 @@ import {
   MapPin,
   Search,
   Navigation,
-  Plus
+  Plus,
+  Phone,
+  UserPlus
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +67,12 @@ export default function CalendarPage() {
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => Invoice.list(),
+    initialData: [],
+  });
+
+  const { data: leads = [] } = useQuery({
+    queryKey: ['leads'],
+    queryFn: () => Lead.list(),
     initialData: [],
   });
 
@@ -267,6 +275,17 @@ export default function CalendarPage() {
       const invoice = invoices.find(inv => inv.test_id === test.id);
       return sum + (invoice?.total || 0);
     }, 0);
+  };
+
+  // Get lead follow-ups for a specific date
+  const getFollowUpsForDay = (date) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return leads.filter(lead => {
+      if (!lead.follow_up_date) return false;
+      const followUpDate = new Date(lead.follow_up_date);
+      const followUpDateStr = `${followUpDate.getFullYear()}-${String(followUpDate.getMonth() + 1).padStart(2, '0')}-${String(followUpDate.getDate()).padStart(2, '0')}`;
+      return followUpDateStr === dateStr && (lead.status === 'Follow Up' || lead.status === 'Pending');
+    });
   };
 
   // Get week days
@@ -659,6 +678,9 @@ export default function CalendarPage() {
                 <Badge className="bg-purple-100 text-purple-700 rounded-lg px-3 py-1">
                   {getTestsForDay(selectedDate).length} jobs
                 </Badge>
+                <Badge className="bg-blue-100 text-blue-700 rounded-lg px-3 py-1">
+                  {getTestsForDay(selectedDate).reduce((sum, t) => sum + (t.sample_count || t.number_of_tests || 0), 0)} samples
+                </Badge>
                 <Badge className="bg-green-100 text-green-700 rounded-lg px-3 py-1">
                   ${getDailySales(selectedDate).toLocaleString()}
                 </Badge>
@@ -712,7 +734,7 @@ export default function CalendarPage() {
                   );
                 })}
 
-              {getTestsForDay(selectedDate).length === 0 && (
+              {getTestsForDay(selectedDate).length === 0 && getFollowUpsForDay(selectedDate).length === 0 && (
                 <div className="text-center py-12">
                   <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-gray-700 mb-2">No jobs scheduled</h3>
@@ -720,6 +742,54 @@ export default function CalendarPage() {
                 </div>
               )}
             </div>
+
+            {/* Follow-ups Section */}
+            {getFollowUpsForDay(selectedDate).length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <UserPlus className="w-5 h-5 text-amber-500" />
+                  <h4 className="text-lg font-bold text-gray-800">Follow-ups</h4>
+                  <Badge className="bg-amber-100 text-amber-700 rounded-lg px-2 py-0.5 text-sm">
+                    {getFollowUpsForDay(selectedDate).length}
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {getFollowUpsForDay(selectedDate).map(lead => (
+                    <div
+                      key={lead.id}
+                      className="clay-button rounded-2xl p-4 border-l-4 border-amber-400"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center">
+                          <Phone className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-gray-800">{lead.client_name}</p>
+                          <p className="text-sm text-gray-600">{lead.phone}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className="bg-amber-100 text-amber-700 rounded px-2 py-0.5 text-xs">
+                              {lead.lead_source}
+                            </Badge>
+                            <span className="text-xs text-gray-500">${lead.quote_amount}</span>
+                            {lead.referred_by_company && (
+                              <span className="text-xs text-purple-600">via {lead.referred_by_company}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge className="bg-amber-100 text-amber-700 rounded-lg px-3 py-1">
+                            {lead.status}
+                          </Badge>
+                          {lead.notes && (
+                            <p className="text-xs text-gray-500 mt-1 max-w-[150px] truncate">{lead.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
