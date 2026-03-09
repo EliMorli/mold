@@ -744,6 +744,92 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Lab Reports Overdue & Reports Not Sent */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Lab Reports Overdue */}
+            <div className="clay-card rounded-3xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Lab Reports Overdue</h3>
+                  <p className="text-sm text-gray-500">Waiting on lab results</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {tests.filter(t => {
+                  if (t.status !== 'Lab Analysis') return false;
+                  if (!t.lab_due_date) return false;
+                  const dueDate = new Date(t.lab_due_date);
+                  return dueDate < new Date();
+                }).map(test => (
+                  <div
+                    key={test.id}
+                    onClick={() => window.location.href = `${createPageUrl('TestProfile')}?id=${test.id}`}
+                    className="clay-button rounded-xl p-3 flex justify-between items-center cursor-pointer hover:scale-[1.01]"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-700 text-sm">{test.test_number}</p>
+                      <p className="text-xs text-gray-500">{test.lab_name || 'No lab assigned'}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge className="bg-red-100 text-red-700 rounded-lg px-2 py-0.5 text-xs">
+                        {Math.ceil((new Date() - new Date(test.lab_due_date)) / (1000 * 60 * 60 * 24))}d overdue
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {tests.filter(t => t.status === 'Lab Analysis' && t.lab_due_date && new Date(t.lab_due_date) < new Date()).length === 0 && (
+                  <div className="text-center py-4">
+                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No overdue lab reports</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Reports Not Sent */}
+            <div className="clay-card rounded-3xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Reports Not Sent</h3>
+                  <p className="text-sm text-gray-500">Need to send to customer</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {tests.filter(t => {
+                  return t.status === 'Completed' && t.recommendation_pdf_url && !t.recommendation_sent;
+                }).map(test => (
+                  <div
+                    key={test.id}
+                    onClick={() => window.location.href = `${createPageUrl('TestProfile')}?id=${test.id}`}
+                    className="clay-button rounded-xl p-3 flex justify-between items-center cursor-pointer hover:scale-[1.01]"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-700 text-sm">{test.test_number}</p>
+                      <p className="text-xs text-gray-500">{test.client_name}</p>
+                    </div>
+                    <Badge className="bg-amber-100 text-amber-700 rounded-lg px-2 py-0.5 text-xs">
+                      Ready to send
+                    </Badge>
+                  </div>
+                ))}
+                {tests.filter(t => t.status === 'Completed' && t.recommendation_pdf_url && !t.recommendation_sent).length === 0 && (
+                  <div className="text-center py-4">
+                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">All reports sent</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Technician Pay */}
           <div className="clay-card rounded-3xl p-6">
             <div className="flex items-center justify-between mb-4">

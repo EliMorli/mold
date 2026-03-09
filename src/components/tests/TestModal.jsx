@@ -32,12 +32,19 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
     results: 'Pending',
     lab_report_url: '',
     recommendation_pdf_url: '',
+    recommendation_sent: false,
+    recommendation_sent_date: '',
     photos: [],
     invoice_id: '',
     notes: '',
     access_instructions: '',
     client_comments_special_requests: '',
     cost: 0,
+    referred_by: '',
+    referred_by_company: '',
+    lab_received_date: '',
+    lab_turnaround_hours: 24,
+    lab_due_date: '',
     ...test
   });
 
@@ -355,6 +362,42 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
                         </>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Referred By */}
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">Referred By</Label>
+                  <Select
+                    value={formData.referred_by || ''}
+                    onValueChange={(value) => setFormData({...formData, referred_by: value, referred_by_company: value === 'Referral' ? formData.referred_by_company : (value === 'Direct' || value === 'Google' || value === 'TikTok' || value === 'Facebook' || value === 'Website' || value === 'Yelp' || value === 'HomeAdvisor' || value === 'Angi' ? '' : value)})}
+                  >
+                    <SelectTrigger className="clay-button rounded-2xl border-0">
+                      <SelectValue placeholder="Select referral source..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Direct">Direct</SelectItem>
+                      <SelectItem value="Google">Google</SelectItem>
+                      <SelectItem value="TikTok">TikTok</SelectItem>
+                      <SelectItem value="Facebook">Facebook</SelectItem>
+                      <SelectItem value="Website">Website</SelectItem>
+                      <SelectItem value="Yelp">Yelp</SelectItem>
+                      <SelectItem value="HomeAdvisor">HomeAdvisor</SelectItem>
+                      <SelectItem value="Angi">Angi</SelectItem>
+                      <SelectItem value="Referral">Referral Company</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.referred_by === 'Referral' && (
+                  <div>
+                    <Label className="text-gray-700 font-medium mb-2 block">Referral Company Name</Label>
+                    <Input
+                      value={formData.referred_by_company || ''}
+                      onChange={(e) => setFormData({...formData, referred_by_company: e.target.value})}
+                      className="clay-button rounded-2xl border-0"
+                      placeholder="e.g., All In One Restoration"
+                    />
                   </div>
                 )}
               </div>

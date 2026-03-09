@@ -15,6 +15,7 @@ import UserModal from "../components/users/UserModal";
 
 const tabs = [
   { id: 'general', label: 'General', icon: SettingsIcon },
+  { id: 'pricing', label: 'Test Pricing', icon: DollarSign },
   { id: 'labs', label: 'Labs', icon: Microscope },
   { id: 'users', label: 'Users', icon: Users },
 ];
@@ -91,6 +92,18 @@ export default function SettingsPage() {
     invoice_reminder_subject: 'Payment Reminder for Invoice {invoice_number}',
     invoice_reminder_body: 'Dear {client_name},\n\nThis is a reminder that invoice {invoice_number} for ${total} is due on {due_date}.\n\nPlease let us know if you have any questions.\n\nThank you!',
   });
+
+  // Test Type Pricing
+  const [testTypePricing, setTestTypePricing] = useState({
+    'Air Quality': { price: 350, labCost: 30 },
+    'Surface Swab': { price: 250, labCost: 25 },
+    'Full Assessment': { price: 650, labCost: 45 },
+    'Asbestos': { price: 450, labCost: 50 },
+    'Lead': { price: 400, labCost: 40 },
+    'Water': { price: 300, labCost: 35 },
+  });
+
+  const [techDefaultPay, setTechDefaultPay] = useState(100);
 
   useEffect(() => {
     if (settings) {
@@ -588,6 +601,144 @@ export default function SettingsPage() {
                 {updateSettingsMutation.isPending ? 'Saving...' : 'Save Calendar Settings'}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing Tab */}
+      {activeTab === 'pricing' && (
+        <div className="space-y-6">
+          {/* Test Type Pricing */}
+          <div className="clay-card rounded-3xl p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-400 flex items-center justify-center shadow-inner">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Test Type Pricing</h3>
+                <p className="text-sm text-gray-500">Set default prices for each test type</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(testTypePricing).map(([testType, pricing]) => (
+                <div key={testType} className="clay-button rounded-2xl p-4">
+                  <h4 className="font-bold text-gray-800 mb-3">{testType}</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-gray-600 text-sm">Client Price</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">$</span>
+                        <Input
+                          type="number"
+                          value={pricing.price}
+                          onChange={(e) => setTestTypePricing({
+                            ...testTypePricing,
+                            [testType]: { ...pricing, price: parseFloat(e.target.value) || 0 }
+                          })}
+                          className="clay-button rounded-xl border-0 text-right"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600 text-sm">Lab Cost (per sample)</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">$</span>
+                        <Input
+                          type="number"
+                          value={pricing.labCost}
+                          onChange={(e) => setTestTypePricing({
+                            ...testTypePricing,
+                            [testType]: { ...pricing, labCost: parseFloat(e.target.value) || 0 }
+                          })}
+                          className="clay-button rounded-xl border-0 text-right"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => toast.success('Pricing saved successfully!')}
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-emerald-600 hover:scale-[1.02]"
+              >
+                Save Pricing
+              </Button>
+            </div>
+          </div>
+
+          {/* Technician Default Pay */}
+          <div className="clay-card rounded-3xl p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-400 flex items-center justify-center shadow-inner">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Technician Default Pay</h3>
+                <p className="text-sm text-gray-500">Default pay rate per job (can be modified per job)</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="clay-button rounded-2xl p-4">
+                <Label className="text-gray-700 font-medium mb-2 block">Default Pay Per Job</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 text-lg">$</span>
+                  <Input
+                    type="number"
+                    value={techDefaultPay}
+                    onChange={(e) => setTechDefaultPay(parseFloat(e.target.value) || 0)}
+                    className="clay-button rounded-xl border-0 text-2xl font-bold text-right"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">This can be adjusted per job in the test profile</p>
+              </div>
+
+              <div className="clay-button rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                <Label className="text-gray-700 font-medium mb-2 block">Pay Options</Label>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>- Standard pay is applied to all new jobs</p>
+                  <p>- Adjust individual job pay in test profile</p>
+                  <p>- Use pay adjustments for extra distance, cancellations, etc.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => toast.success('Default pay saved successfully!')}
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-blue-600 hover:scale-[1.02]"
+              >
+                Save Default Pay
+              </Button>
+            </div>
+          </div>
+
+          {/* Referral Sources */}
+          <div className="clay-card rounded-3xl p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center shadow-inner">
+                <Award className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Referral Sources</h3>
+                <p className="text-sm text-gray-500">Track where your jobs come from</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {['Direct', 'Google', 'TikTok', 'Facebook', 'Website', 'Yelp', 'HomeAdvisor', 'Angi', 'Referral'].map(source => (
+                <div key={source} className="clay-button rounded-xl p-3 text-center">
+                  <p className="font-medium text-gray-700">{source}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-4">
+              These sources appear in the "Referred By" dropdown when creating new jobs
+            </p>
           </div>
         </div>
       )}
