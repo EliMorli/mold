@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, User, Bell, Shield, DollarSign, Calendar, Microscope, Users, Plus, Search, Mail, Phone, Award, Clock, CheckCircle, Copy, Send } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, DollarSign, Calendar, Microscope, Users, Plus, Search, Mail, Phone, Award, Clock, CheckCircle, Copy, Send, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +12,14 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import LabModal from "../components/labs/LabModal";
 import UserModal from "../components/users/UserModal";
+import QuickBooksSync from "../components/quickbooks/QuickBooksSync";
 
 const tabs = [
   { id: 'general', label: 'General', icon: SettingsIcon },
   { id: 'pricing', label: 'Test Pricing', icon: DollarSign },
   { id: 'labs', label: 'Labs', icon: Microscope },
   { id: 'users', label: 'Users', icon: Users },
+  { id: 'quickbooks', label: 'QuickBooks', icon: FileText },
 ];
 
 export default function SettingsPage() {
@@ -70,6 +72,19 @@ export default function SettingsPage() {
       }
       return allSettings[0];
     },
+  });
+
+  // QuickBooks data
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => base44.entities.Client.list(),
+    initialData: [],
+  });
+
+  const { data: invoices = [] } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => base44.entities.Invoice.list(),
+    initialData: [],
   });
 
   const [calendarSettings, setCalendarSettings] = useState({
@@ -1067,6 +1082,11 @@ export default function SettingsPage() {
             />
           )}
         </div>
+      )}
+
+      {/* QuickBooks Tab */}
+      {activeTab === 'quickbooks' && (
+        <QuickBooksSync clients={clients} invoices={invoices} />
       )}
     </div>
   );

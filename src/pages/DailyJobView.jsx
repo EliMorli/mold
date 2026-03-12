@@ -12,11 +12,13 @@ import {
   Check,
   X,
   DollarSign,
-  Download
+  Download,
+  Route
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createPageUrl } from "@/utils";
+import RouteOptimizer from "@/components/routing/RouteOptimizer";
 
 export default function DailyJobView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -401,6 +403,13 @@ export default function DailyJobView() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Route Optimizer */}
+      {dailyJobs.length >= 2 && (
+        <div className="clay-card rounded-3xl p-6">
+          <RouteOptimizer jobs={dailyJobs} />
         </div>
       )}
     </div>

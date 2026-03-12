@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import GlobalSearch from "@/components/GlobalSearch";
+import { PWAInstallBanner, OfflineIndicator } from "@/components/pwa/PWAInstallBanner";
 import {
   LayoutDashboard,
   FlaskConical,
@@ -214,6 +215,10 @@ export default function Layout({ children, currentPageName }) {
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
+
+      {/* PWA Components */}
+      <OfflineIndicator />
+      <PWAInstallBanner />
     </div>
   );
 }
