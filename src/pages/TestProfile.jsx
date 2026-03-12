@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import PhotoGallery from "@/components/photos/PhotoGallery";
 
 export default function TestProfilePage() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -1195,42 +1196,11 @@ export default function TestProfilePage() {
               <ImageIcon className="w-5 h-5" />
               Photos
             </h3>
-            {isEditing && (
-              <div className="mb-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload(e, 'photos')}
-                  className="clay-button rounded-2xl border-0"
-                  disabled={uploading}
-                />
-              </div>
-            )}
-            {formData.photos && formData.photos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {formData.photos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img 
-                      src={photo} 
-                      alt={`Photo ${index + 1}`} 
-                      className="w-full h-32 object-cover rounded-2xl clay-card-hover cursor-pointer"
-                      onClick={() => window.open(photo, '_blank')}
-                    />
-                    {isEditing && (
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400 italic text-sm text-center py-8">No photos uploaded</p>
-            )}
+            <PhotoGallery
+              photos={formData.photos || []}
+              onPhotosChange={(photos) => setFormData(prev => ({ ...prev, photos }))}
+              readOnly={!isEditing}
+            />
           </div>
         </div>
       </div>
