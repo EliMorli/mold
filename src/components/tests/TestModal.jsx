@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { base44 } from "@/api/base44Client";
 import ClientModal from "../clients/ClientModal";
 
-export default function TestModal({ test, clients, technicians, labs, onClose, onSave }) {
+export default function TestModal({ test, clients, technicians, labs, onClose, onSave, saving = false }) {
   const [formData, setFormData] = useState({
     test_number: '',
     client_id: '',
@@ -713,10 +713,10 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
               </Button>
               <Button
                 type="submit"
-                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
-                disabled={uploading}
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={uploading || saving}
               >
-                {test ? 'Update' : 'Create'} Test Profile
+                {saving ? 'Saving...' : `${test ? 'Update' : 'Create'} Test Profile`}
               </Button>
             </div>
           </form>

@@ -956,6 +956,7 @@ export default function CalendarPage() {
           onSave={(data) => {
             updateMutation.mutate({ id: selectedTest.id, data });
           }}
+          saving={updateMutation.isPending}
         />
       )}
     </div>

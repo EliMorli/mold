@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function UserModal({ user, onClose, onSave, onDelete }) {
+export default function UserModal({ user, onClose, onSave, onDelete, saving = false }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -178,9 +178,10 @@ export default function UserModal({ user, onClose, onSave, onDelete }) {
               </Button>
               <Button
                 type="submit"
-                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
+                disabled={saving}
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {user ? 'Update User' : 'Create & Send Verification'}
+                {saving ? 'Saving...' : (user ? 'Update User' : 'Create & Send Verification')}
               </Button>
             </div>
           </div>

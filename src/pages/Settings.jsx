@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import LabModal from "../components/labs/LabModal";
 import UserModal from "../components/users/UserModal";
 import QuickBooksSync from "../components/quickbooks/QuickBooksSync";
+import { getAuditLog } from "@/services/auditLog";
+import { usePermissions } from "@/services/permissions";
 
 const tabs = [
   { id: 'general', label: 'General', icon: SettingsIcon },
@@ -20,11 +22,21 @@ const tabs = [
   { id: 'labs', label: 'Labs', icon: Microscope },
   { id: 'users', label: 'Users', icon: Users },
   { id: 'quickbooks', label: 'QuickBooks', icon: FileText },
+  { id: 'audit', label: 'Activity Log', icon: FileText },
 ];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const queryClient = useQueryClient();
+  const { can, loading: permissionsLoading } = usePermissions();
+
+  // Filter tabs based on user permissions
+  const visibleTabs = tabs.filter(tab => {
+    if (tab.id === 'users') return can('canManageUsers');
+    if (tab.id === 'quickbooks') return can('canSyncQuickBooks');
+    if (tab.id === 'audit') return can('canViewAuditLog');
+    return true; // General, Pricing, Labs visible to all settings viewers
+  });
 
   // ========== GENERAL SETTINGS ==========
   const { data: currentUser } = useQuery({
@@ -89,6 +101,22 @@ export default function SettingsPage() {
     initialData: [],
     staleTime: 0,
     refetchOnMount: 'always',
+  });
+
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: () => base44.entities.Expense.list(),
+    initialData: [],
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  // Audit log query (only fetch when on audit tab)
+  const { data: auditLogEntries = [], isLoading: auditLoading, refetch: refetchAuditLog } = useQuery({
+    queryKey: ['audit-log'],
+    queryFn: () => getAuditLog(100),
+    enabled: activeTab === 'audit',
+    staleTime: 30000,
   });
 
   const [calendarSettings, setCalendarSettings] = useState({
@@ -319,7 +347,7 @@ export default function SettingsPage() {
       {/* Tabs */}
       <div className="clay-card rounded-3xl p-2">
         <div className="flex gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -886,6 +914,7 @@ export default function SettingsPage() {
                   createLabMutation.mutate(data);
                 }
               }}
+              saving={createLabMutation.isPending || updateLabMutation.isPending}
             />
           )}
         </div>
@@ -1083,6 +1112,7 @@ export default function SettingsPage() {
                 setShowUserModal(false);
                 setSelectedUser(null);
               } : null}
+              saving={createUserMutation.isPending || updateUserMutation.isPending}
             />
           )}
         </div>
@@ -1093,8 +1123,71 @@ export default function SettingsPage() {
         <QuickBooksSync
           clients={clients}
           invoices={invoices}
-          isLoading={clientsLoading || invoicesLoading}
+          expenses={expenses}
+          isLoading={clientsLoading || invoicesLoading || expensesLoading}
         />
+      )}
+
+      {/* Audit Log Tab */}
+      {activeTab === 'audit' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Activity Log</h2>
+              <p className="text-sm text-gray-500">Track changes to clients, invoices, tests, leads, and expenses</p>
+            </div>
+            <Button
+              onClick={() => refetchAuditLog()}
+              className="clay-button rounded-xl px-4 py-2 text-sm text-gray-600"
+            >
+              Refresh
+            </Button>
+          </div>
+
+          {auditLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading activity log...</div>
+          ) : auditLogEntries.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No activity recorded yet</p>
+              <p className="text-xs text-gray-400 mt-1">Create, edit, or delete records to see them logged here</p>
+            </div>
+          ) : (
+            <div className="clay-card rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600">Time</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600">User</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600">Action</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600">Summary</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogEntries.map((entry, idx) => (
+                    <tr key={entry.id || idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 text-gray-500 text-xs">
+                        {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-gray-700">{entry.user_name || 'System'}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={`rounded-lg px-2 py-0.5 text-xs ${
+                          entry.operation === 'create' ? 'bg-green-100 text-green-700' :
+                          entry.operation === 'update' ? 'bg-blue-100 text-blue-700' :
+                          entry.operation === 'delete' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {entry.operation || 'unknown'}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-gray-800">{entry.summary || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -40,7 +40,7 @@ const isValidPhone = (phone) => {
   return isValid;
 };
 
-export default function ClientModal({ client, onClose, onSave }) {
+export default function ClientModal({ client, onClose, onSave, saving = false }) {
   const [clientType, setClientType] = useState(client?.client_type || 'Direct Client');
   const [formData, setFormData] = useState({
     name: '',
@@ -426,9 +426,10 @@ export default function ClientModal({ client, onClose, onSave }) {
             </Button>
             <Button
               type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-blue-600 hover:scale-105 transition-transform"
+              disabled={saving}
+              className="clay-button rounded-2xl px-6 py-3 font-semibold text-blue-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {client ? 'Update' : 'Create'} Client
+              {saving ? 'Saving...' : (client ? 'Update' : 'Create')} {!saving && 'Client'}
             </Button>
           </div>
         </form>

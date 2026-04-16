@@ -4,11 +4,13 @@ import './App.css'
 import Pages from "@/pages/index.jsx"
 import { Toaster } from "@/components/ui/toaster"
 import { initQuickBooksAutoSync } from '@/services/quickbooksAutoSync'
+import { initAuditLog } from '@/services/auditLog'
 
 function App() {
   // Surface persistence errors (e.g., localStorage quota exceeded) to the user
   useEffect(() => {
     initQuickBooksAutoSync();
+    initAuditLog();
 
     const handler = (e) => {
       toast.error('Failed to save data', {

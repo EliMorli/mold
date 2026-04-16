@@ -168,6 +168,7 @@ export default function LabsPage() {
               createMutation.mutate(data);
             }
           }}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

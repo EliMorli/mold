@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from "@/api/base44Client";
 
-export default function InvoiceModal({ invoice, clients, tests, onClose, onSave }) {
+export default function InvoiceModal({ invoice, clients, tests, onClose, onSave, saving = false }) {
   // Calculate default due date (30 days from today)
   const getDefaultDueDate = () => {
     const dueDate = new Date();
@@ -465,9 +465,10 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave 
             </Button>
             <Button
               type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-green-600 hover:scale-105 transition-transform"
+              disabled={saving}
+              className="clay-button rounded-2xl px-6 py-3 font-semibold text-green-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {invoice ? 'Update' : 'Create'} Invoice
+              {saving ? 'Saving...' : `${invoice ? 'Update' : 'Create'} Invoice`}
             </Button>
           </div>
         </form>

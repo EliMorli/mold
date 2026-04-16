@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 
-export default function ExpenseModal({ expense, onClose, onSave }) {
+export default function ExpenseModal({ expense, onClose, onSave, saving = false }) {
   const [formData, setFormData] = useState({
     description: '',
     category: 'Other',
@@ -428,9 +428,10 @@ export default function ExpenseModal({ expense, onClose, onSave }) {
             </Button>
             <Button
               type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-red-600 hover:scale-105 transition-transform"
+              disabled={saving}
+              className="clay-button rounded-2xl px-6 py-3 font-semibold text-red-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {expense ? 'Update' : 'Create'} Expense
+              {saving ? 'Saving...' : `${expense ? 'Update' : 'Create'} Expense`}
             </Button>
           </div>
         </form>

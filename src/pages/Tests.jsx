@@ -221,6 +221,7 @@ export default function TestsPage() {
               createMutation.mutate(data);
             }
           }}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

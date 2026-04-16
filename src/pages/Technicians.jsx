@@ -204,6 +204,7 @@ export default function TechniciansPage() {
               createMutation.mutate(data);
             }
           }}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

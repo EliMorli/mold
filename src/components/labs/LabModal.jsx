@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from "@/api/base44Client";
 
-export default function LabModal({ lab, onClose, onSave }) {
+export default function LabModal({ lab, onClose, onSave, saving = false }) {
   const [formData, setFormData] = useState({
     name: '',
     accreditation: '',
@@ -243,9 +243,10 @@ export default function LabModal({ lab, onClose, onSave }) {
             </Button>
             <Button
               type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
+              disabled={saving}
+              className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {lab ? 'Update' : 'Create'} Lab
+              {saving ? 'Saving...' : `${lab ? 'Update' : 'Create'} Lab`}
             </Button>
           </div>
         </form>
