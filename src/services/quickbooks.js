@@ -161,23 +161,25 @@ export function getConnectionInfo() {
   };
 }
 
-// ============ API calls ============
+// ============ API calls (routed through /api/quickbooks/proxy to avoid CORS) ============
 
 async function qbRequest(endpoint, options = {}) {
   const accessToken = await getAccessToken();
   if (!accessToken) throw new Error('Not connected to QuickBooks');
 
   const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
-  const url = `${getBaseUrl()}/v3/company/${realmId}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+  const response = await fetch('/api/quickbooks/proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      endpoint,
+      method: options.method || 'GET',
+      body: options.body ? JSON.parse(options.body) : undefined,
+      accessToken,
+      realmId,
+      environment: QB_CONFIG.environment,
+    }),
   });
 
   if (response.status === 401) {
@@ -187,7 +189,7 @@ async function qbRequest(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.Fault?.Error?.[0]?.Message || 'QuickBooks API error');
+    throw new Error(error.Fault?.Error?.[0]?.Message || error.error || 'QuickBooks API error');
   }
 
   return response.json();
