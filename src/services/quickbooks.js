@@ -504,19 +504,21 @@ async function findBankAccount() {
 async function findExpenseAccount(category) {
   const accounts = await getQBAccounts();
   // Map app categories to QB expense account types
+  // IMPORTANT: Only Expense, Other Expense, and Cost of Goods Sold are valid
+  // for AccountBasedExpenseLineDetail - NOT Fixed Asset or other types
   const categoryMap = {
-    'Lab Fees': ['Cost of Goods Sold', 'Expense'],
-    'Equipment': ['Fixed Asset', 'Expense'],
-    'Travel': ['Expense'],
-    'Marketing': ['Expense'],
-    'Office Supplies': ['Expense'],
-    'Insurance': ['Expense'],
-    'Utilities': ['Expense'],
-    'Salaries': ['Expense'],
-    'Other': ['Expense'],
+    'Lab Fees': ['Cost of Goods Sold', 'Expense', 'Other Expense'],
+    'Equipment': ['Expense', 'Other Expense', 'Cost of Goods Sold'],
+    'Travel': ['Expense', 'Other Expense'],
+    'Marketing': ['Expense', 'Other Expense'],
+    'Office Supplies': ['Expense', 'Other Expense'],
+    'Insurance': ['Expense', 'Other Expense'],
+    'Utilities': ['Expense', 'Other Expense'],
+    'Salaries': ['Expense', 'Other Expense'],
+    'Other': ['Expense', 'Other Expense', 'Cost of Goods Sold'],
   };
 
-  const preferredTypes = categoryMap[category] || ['Expense'];
+  const preferredTypes = categoryMap[category] || ['Expense', 'Other Expense'];
 
   for (const acctType of preferredTypes) {
     const expenseAccount = accounts.find(a => a.AccountType === acctType && a.Active !== false);
@@ -529,7 +531,10 @@ async function findExpenseAccount(category) {
   );
   if (anyExpense) return { value: anyExpense.Id, name: anyExpense.Name };
 
-  throw new Error('No valid expense account found in QuickBooks. Please create an Expense account first.');
+  // Log available accounts for debugging
+  const accountTypes = [...new Set(accounts.map(a => a.AccountType))];
+  console.error('[QB] No expense account found. Available types:', accountTypes);
+  throw new Error(`No valid expense account found in QuickBooks. Available account types: ${accountTypes.join(', ')}. Please create an Expense account.`);
 }
 
 // Tag embedded in PrivateNote to identify expenses created from this app
