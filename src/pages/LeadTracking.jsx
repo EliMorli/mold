@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 import LeadModal from "../components/leads/LeadModal";
 import { createPageUrl } from "@/utils";
 
@@ -58,7 +59,9 @@ export default function LeadTracking() {
       queryClient.invalidateQueries(['leads']);
       setShowModal(false);
       setSelectedLead(null);
+      toast.success('Lead created');
     },
+    onError: (e) => toast.error('Failed to create lead', { description: e.message }),
   });
 
   const updateMutation = useMutation({
@@ -68,6 +71,50 @@ export default function LeadTracking() {
       setShowModal(false);
       setSelectedLead(null);
     },
+    onError: (e) => toast.error('Failed to save lead', { description: e.message }),
+  });
+
+  // Convert a lead into a Client record (preserving link via converted_client_id)
+  const convertMutation = useMutation({
+    mutationFn: async (leadData) => {
+      if (!selectedLead) throw new Error('No lead selected');
+      // Check for existing client by name/email to avoid duplicates
+      const existingClients = await base44.entities.Client.list();
+      const match = existingClients.find(c =>
+        (leadData.email && c.email?.toLowerCase() === leadData.email.toLowerCase()) ||
+        (leadData.client_name && c.name?.toLowerCase() === leadData.client_name.toLowerCase())
+      );
+      let client;
+      if (match) {
+        client = match;
+      } else {
+        client = await base44.entities.Client.create({
+          name: leadData.client_name,
+          email: leadData.email || '',
+          phone: leadData.phone || '',
+          address: leadData.address || '',
+          client_type: 'Homeowner',
+          notes: leadData.notes ? `Converted from lead. ${leadData.notes}` : 'Converted from lead.',
+          lead_source: leadData.lead_source || '',
+        });
+      }
+      await base44.entities.Lead.update(selectedLead.id, {
+        converted_client_id: client.id,
+        status: leadData.status === 'Completed' ? 'Completed' : leadData.status,
+      });
+      return { client, wasExisting: !!match };
+    },
+    onSuccess: ({ client, wasExisting }) => {
+      queryClient.invalidateQueries(['leads']);
+      queryClient.invalidateQueries(['clients']);
+      setShowModal(false);
+      setSelectedLead(null);
+      toast.success(
+        wasExisting ? `Linked to existing client: ${client.name}` : `Client created: ${client.name}`,
+        { description: wasExisting ? 'The lead is now linked to this existing client.' : 'They will auto-sync to QuickBooks if connected.' }
+      );
+    },
+    onError: (e) => toast.error('Failed to convert lead', { description: e.message }),
   });
 
   // Status colors matching the spreadsheet
@@ -440,6 +487,8 @@ export default function LeadTracking() {
               createMutation.mutate(data);
             }
           }}
+          onConvertToClient={(data) => convertMutation.mutate(data)}
+          converting={convertMutation.isPending}
         />
       )}
     </div>

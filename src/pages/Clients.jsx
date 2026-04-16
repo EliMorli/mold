@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { createPageUrl } from "@/utils";
+import { toast } from "sonner";
 import ClientModal from "../components/clients/ClientModal";
 
 export default function ClientsPage() {
@@ -29,20 +30,24 @@ export default function ClientsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Client.create(data),
-    onSuccess: () => {
+    onSuccess: (client) => {
       queryClient.invalidateQueries(['clients']);
       setShowModal(false);
       setSelectedClient(null);
+      toast.success(`Client created: ${client?.name || ''}`);
     },
+    onError: (e) => toast.error('Failed to create client', { description: e.message }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
-    onSuccess: () => {
+    onSuccess: (client) => {
       queryClient.invalidateQueries(['clients']);
       setShowModal(false);
       setSelectedClient(null);
+      toast.success(`Client updated: ${client?.name || ''}`);
     },
+    onError: (e) => toast.error('Failed to update client', { description: e.message }),
   });
 
   // Calculate open balance for each client
