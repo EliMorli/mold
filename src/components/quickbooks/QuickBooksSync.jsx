@@ -2,261 +2,208 @@ import { useState, useEffect } from "react";
 import {
   RefreshCw,
   Download,
-  Upload,
   Check,
   AlertCircle,
   FileText,
   Users,
   DollarSign,
-  Settings,
   ExternalLink,
   Loader2,
-  Calendar,
   CheckCircle,
-  XCircle
+  XCircle,
+  Link as LinkIcon,
+  Unlink,
+  Building2,
+  ArrowRight,
+  AlertTriangle,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import * as QB from "@/services/quickbooks";
 
-// QuickBooks IIF export format helper
+// ---------- IIF/CSV fallback helpers ----------
 const generateIIF = {
-  // Generate IIF header
-  header: (type) => {
-    const headers = {
-      customers: '!CUST\tNAME\tBADDR1\tBADDR2\tBADDR3\tBADDR4\tPHONE1\tEMAIL\tCONT1\n',
-      invoices: '!TRNS\tTRNSID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\n!SPL\tSPLID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\n!ENDTRNS\n',
-    };
-    return headers[type] || '';
-  },
-
-  // Format customer for IIF
-  customer: (client) => {
-    const name = (client.name || '').replace(/\t/g, ' ');
-    const address = (client.address || '').split(',');
+  header: (type) => ({
+    customers: '!CUST\tNAME\tBADDR1\tBADDR2\tBADDR3\tBADDR4\tPHONE1\tEMAIL\tCONT1\n',
+    invoices: '!TRNS\tTRNSID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\n!SPL\tSPLID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\n!ENDTRNS\n',
+  }[type] || ''),
+  customer: (c) => {
+    const name = (c.name || '').replace(/\t/g, ' ');
+    const address = (c.address || '').split(',');
     const addr1 = address[0]?.trim() || '';
     const addr2 = address.slice(1).join(',').trim() || '';
-    const phone = (client.phone || '').replace(/\t/g, ' ');
-    const email = (client.email || '').replace(/\t/g, ' ');
-
+    const phone = (c.phone || '').replace(/\t/g, ' ');
+    const email = (c.email || '').replace(/\t/g, ' ');
     return `CUST\t${name}\t${addr1}\t${addr2}\t\t\t${phone}\t${email}\t${name}\n`;
   },
-
-  // Format invoice for IIF
-  invoice: (invoice, lineItems = []) => {
-    const date = invoice.issue_date ?
-      new Date(invoice.issue_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) :
-      new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-
-    const customerName = (invoice.client_name || '').replace(/\t/g, ' ');
-    const amount = parseFloat(invoice.total) || 0;
-    const docNum = invoice.invoice_number || '';
-    const memo = (invoice.notes || 'Mold Testing Services').replace(/\t/g, ' ');
-
-    // Transaction line
-    let iif = `TRNS\t\tINVOICE\t${date}\tAccounts Receivable\t${customerName}\t${amount.toFixed(2)}\t${docNum}\t${memo}\n`;
-
-    // Split line (income account)
-    iif += `SPL\t\tINVOICE\t${date}\tServices Income\t${customerName}\t${(-amount).toFixed(2)}\t${memo}\n`;
-
-    iif += `ENDTRNS\n`;
-
-    return iif;
-  }
+  invoice: (inv) => {
+    const date = inv.issue_date
+      ? new Date(inv.issue_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const customerName = (inv.client_name || '').replace(/\t/g, ' ');
+    const amount = parseFloat(inv.total) || 0;
+    const docNum = inv.invoice_number || '';
+    const memo = (inv.notes || 'Mold Testing Services').replace(/\t/g, ' ');
+    return (
+      `TRNS\t\tINVOICE\t${date}\tAccounts Receivable\t${customerName}\t${amount.toFixed(2)}\t${docNum}\t${memo}\n` +
+      `SPL\t\tINVOICE\t${date}\tServices Income\t${customerName}\t${(-amount).toFixed(2)}\t${memo}\n` +
+      `ENDTRNS\n`
+    );
+  },
 };
 
+const downloadFile = (content, filename, contentType) => {
+  const blob = new Blob([content], { type: contentType });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+const formatDateForFile = () => new Date().toISOString().split('T')[0];
+
+// ---------- Main component ----------
 export default function QuickBooksSync({ clients = [], invoices = [] }) {
-  const [settings, setSettings] = useState({
-    autoSync: false,
-    syncInterval: 'daily',
-    lastSync: null,
-    accountsReceivable: 'Accounts Receivable',
-    servicesIncome: 'Services Income',
-    companyName: 'JohnMold Testing Services'
-  });
-
+  const [connectionInfo, setConnectionInfo] = useState(QB.getConnectionInfo());
   const [syncing, setSyncing] = useState(false);
-  const [exportStatus, setExportStatus] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+  const [syncResults, setSyncResults] = useState(null);
+  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
 
-  // Load settings from localStorage
+  const hasCreds = QB.hasCredentials();
+
+  // Handle OAuth callback on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('quickbooks_settings');
-      if (saved) {
-        setSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
-      }
-    } catch (e) {
-      console.error('Error loading QuickBooks settings:', e);
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const realmId = urlParams.get('realmId');
+
+    if (code && state && realmId) {
+      (async () => {
+        setConnecting(true);
+        try {
+          await QB.handleOAuthCallback(code, state, realmId);
+          setConnectionInfo(QB.getConnectionInfo());
+          toast.success('Successfully connected to QuickBooks!');
+        } catch (e) {
+          console.error('OAuth error:', e);
+          toast.error(e.message || 'Failed to connect to QuickBooks');
+        } finally {
+          setConnecting(false);
+          // Clean up URL
+          const cleanUrl = window.location.pathname + '?tab=quickbooks';
+          window.history.replaceState({}, '', cleanUrl);
+        }
+      })();
     }
   }, []);
 
-  // Save settings
-  const saveSettings = (newSettings) => {
-    setSettings(newSettings);
-    localStorage.setItem('quickbooks_settings', JSON.stringify(newSettings));
-    toast.success('QuickBooks settings saved');
-  };
-
-  // Export customers to IIF
-  const exportCustomersIIF = () => {
+  const handleConnect = () => {
     try {
-      let iif = generateIIF.header('customers');
-
-      clients.forEach(client => {
-        iif += generateIIF.customer(client);
-      });
-
-      downloadFile(iif, `customers_${formatDateForFile()}.iif`, 'text/plain');
-      toast.success(`Exported ${clients.length} customers`);
-      setExportStatus({ type: 'customers', count: clients.length, date: new Date() });
-    } catch (error) {
-      console.error('Error exporting customers:', error);
-      toast.error('Failed to export customers');
+      window.location.href = QB.getAuthorizationUrl();
+    } catch (e) {
+      toast.error(e.message);
     }
   };
 
-  // Export invoices to IIF
-  const exportInvoicesIIF = (status = 'all') => {
-    try {
-      let filteredInvoices = invoices;
-
-      if (status !== 'all') {
-        filteredInvoices = invoices.filter(inv => inv.status === status);
-      }
-
-      let iif = generateIIF.header('invoices');
-
-      filteredInvoices.forEach(invoice => {
-        iif += generateIIF.invoice(invoice);
-      });
-
-      downloadFile(iif, `invoices_${status}_${formatDateForFile()}.iif`, 'text/plain');
-      toast.success(`Exported ${filteredInvoices.length} invoices`);
-      setExportStatus({ type: 'invoices', count: filteredInvoices.length, date: new Date() });
-
-      // Update last sync
-      saveSettings({ ...settings, lastSync: new Date().toISOString() });
-    } catch (error) {
-      console.error('Error exporting invoices:', error);
-      toast.error('Failed to export invoices');
-    }
+  const handleDisconnect = () => {
+    QB.clearTokens();
+    setConnectionInfo({ isConnected: false });
+    setSyncResults(null);
+    toast.success('Disconnected from QuickBooks');
   };
 
-  // Export invoices to CSV (QuickBooks compatible)
-  const exportInvoicesCSV = () => {
-    try {
-      const headers = [
-        'Invoice Number',
-        'Customer',
-        'Invoice Date',
-        'Due Date',
-        'Amount',
-        'Status',
-        'Payment Method',
-        'Paid Date',
-        'Email',
-        'Memo'
-      ].join(',');
-
-      const rows = invoices.map(inv => {
-        return [
-          inv.invoice_number || '',
-          `"${(inv.client_name || '').replace(/"/g, '""')}"`,
-          inv.issue_date ? new Date(inv.issue_date).toLocaleDateString() : '',
-          inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '',
-          inv.total || 0,
-          inv.status || '',
-          inv.payment_method || '',
-          inv.paid_date ? new Date(inv.paid_date).toLocaleDateString() : '',
-          inv.client_email || '',
-          `"${(inv.notes || '').replace(/"/g, '""')}"`
-        ].join(',');
-      }).join('\n');
-
-      downloadFile(`${headers}\n${rows}`, `invoices_${formatDateForFile()}.csv`, 'text/csv');
-      toast.success(`Exported ${invoices.length} invoices to CSV`);
-    } catch (error) {
-      console.error('Error exporting invoices CSV:', error);
-      toast.error('Failed to export invoices');
-    }
-  };
-
-  // Export customers to CSV
-  const exportCustomersCSV = () => {
-    try {
-      const headers = [
-        'Customer Name',
-        'Email',
-        'Phone',
-        'Address',
-        'Customer Type',
-        'Sales Rep',
-        'Sales Rep Phone',
-        'Created Date'
-      ].join(',');
-
-      const rows = clients.map(client => {
-        return [
-          `"${(client.name || '').replace(/"/g, '""')}"`,
-          client.email || '',
-          client.phone || '',
-          `"${(client.address || '').replace(/"/g, '""')}"`,
-          client.client_type || '',
-          client.sales_rep_name || '',
-          client.sales_rep_phone || '',
-          client.created_date ? new Date(client.created_date).toLocaleDateString() : ''
-        ].join(',');
-      }).join('\n');
-
-      downloadFile(`${headers}\n${rows}`, `customers_${formatDateForFile()}.csv`, 'text/csv');
-      toast.success(`Exported ${clients.length} customers to CSV`);
-    } catch (error) {
-      console.error('Error exporting customers CSV:', error);
-      toast.error('Failed to export customers');
-    }
-  };
-
-  // Helper to download file
-  const downloadFile = (content, filename, contentType) => {
-    const blob = new Blob([content], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
-
-  // Format date for filename
-  const formatDateForFile = () => {
-    return new Date().toISOString().split('T')[0];
-  };
-
-  // Simulate sync
-  const performSync = async () => {
+  const handleSyncAll = async () => {
     setSyncing(true);
+    setSyncResults(null);
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Export both customers and invoices
-      exportCustomersIIF();
-      exportInvoicesIIF('all');
-
-      toast.success('Sync completed successfully');
-    } catch (error) {
-      toast.error('Sync failed');
+      const results = await QB.performFullSync(clients, invoices);
+      setSyncResults(results);
+      const totalCreated = results.customers.created + results.invoices.created;
+      const totalErrors = results.customers.errors.length + results.invoices.errors.length;
+      if (totalErrors === 0) {
+        toast.success(`Synced ${totalCreated} records to QuickBooks`);
+      } else {
+        toast.message(`Synced ${totalCreated} records, ${totalErrors} errors`);
+      }
+    } catch (e) {
+      console.error('Sync error:', e);
+      toast.error(e.message || 'Sync failed');
     } finally {
       setSyncing(false);
     }
   };
 
-  // Calculate stats
+  const handleSyncCustomers = async () => {
+    setSyncing(true);
+    try {
+      const results = await QB.syncCustomersToQB(clients);
+      toast.success(`Created ${results.created}, skipped ${results.skipped} customers`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to sync customers');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSyncInvoices = async () => {
+    setSyncing(true);
+    try {
+      const results = await QB.syncInvoicesToQB(invoices);
+      toast.success(`Created ${results.created}, skipped ${results.skipped} invoices`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to sync invoices');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Export fallback handlers
+  const exportCustomersIIF = () => {
+    let iif = generateIIF.header('customers');
+    clients.forEach(c => { iif += generateIIF.customer(c); });
+    downloadFile(iif, `customers_${formatDateForFile()}.iif`, 'text/plain');
+    toast.success(`Exported ${clients.length} customers`);
+  };
+  const exportInvoicesIIF = () => {
+    let iif = generateIIF.header('invoices');
+    invoices.forEach(i => { iif += generateIIF.invoice(i); });
+    downloadFile(iif, `invoices_${formatDateForFile()}.iif`, 'text/plain');
+    toast.success(`Exported ${invoices.length} invoices`);
+  };
+  const exportCustomersCSV = () => {
+    const headers = ['Customer Name', 'Email', 'Phone', 'Address', 'Customer Type'].join(',');
+    const rows = clients.map(c => [
+      `"${(c.name || '').replace(/"/g, '""')}"`,
+      c.email || '',
+      c.phone || '',
+      `"${(c.address || '').replace(/"/g, '""')}"`,
+      c.client_type || ''
+    ].join(',')).join('\n');
+    downloadFile(`${headers}\n${rows}`, `customers_${formatDateForFile()}.csv`, 'text/csv');
+    toast.success(`Exported ${clients.length} customers`);
+  };
+  const exportInvoicesCSV = () => {
+    const headers = ['Invoice Number', 'Customer', 'Date', 'Due Date', 'Amount', 'Status'].join(',');
+    const rows = invoices.map(inv => [
+      inv.invoice_number || '',
+      `"${(inv.client_name || '').replace(/"/g, '""')}"`,
+      inv.issue_date ? new Date(inv.issue_date).toLocaleDateString() : '',
+      inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '',
+      inv.total || 0,
+      inv.status || ''
+    ].join(',')).join('\n');
+    downloadFile(`${headers}\n${rows}`, `invoices_${formatDateForFile()}.csv`, 'text/csv');
+    toast.success(`Exported ${invoices.length} invoices`);
+  };
+
   const paidInvoices = invoices.filter(inv => inv.status === 'Paid');
   const unpaidInvoices = invoices.filter(inv => inv.status !== 'Paid' && inv.status !== 'Cancelled');
   const totalPaid = paidInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0);
@@ -265,30 +212,90 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
             <DollarSign className="w-6 h-6 text-white" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">QuickBooks Integration</h2>
-            <p className="text-sm text-gray-500">Export data for QuickBooks Desktop or Online</p>
+            <p className="text-sm text-gray-500">
+              {connectionInfo.isConnected
+                ? `Connected to ${connectionInfo.companyName || 'QuickBooks'}`
+                : 'Connect to sync customers and invoices automatically'}
+            </p>
           </div>
         </div>
 
-        <Button
-          onClick={performSync}
-          disabled={syncing}
-          className="clay-button rounded-2xl px-4 py-2 flex items-center gap-2 text-green-600 font-semibold"
-        >
-          {syncing ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4" />
-          )}
-          Sync All
-        </Button>
+        {connectionInfo.isConnected ? (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-green-100 text-green-700 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4" />
+              Connected
+            </Badge>
+            <Button
+              onClick={handleDisconnect}
+              className="clay-button rounded-xl px-3 py-2 flex items-center gap-1.5 text-red-600 text-sm"
+            >
+              <Unlink className="w-4 h-4" />
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <Button
+            onClick={handleConnect}
+            disabled={connecting || !hasCreds}
+            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-4 py-2 flex items-center gap-2 font-semibold disabled:opacity-50"
+          >
+            {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+            Connect to QuickBooks
+          </Button>
+        )}
       </div>
+
+      {/* Setup Warning */}
+      {!hasCreds && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm flex-1">
+              <p className="font-medium text-yellow-800 mb-1">QuickBooks API Credentials Required</p>
+              <p className="text-yellow-700 mb-2">
+                To enable Live Sync, configure these environment variables on your hosting platform (e.g., Vercel):
+              </p>
+              <code className="block bg-yellow-100 p-2 rounded-lg text-xs text-yellow-800 overflow-x-auto">
+                VITE_QUICKBOOKS_CLIENT_ID=...{'\n'}
+                VITE_QUICKBOOKS_REDIRECT_URI={window.location.origin}/Settings?tab=quickbooks{'\n'}
+                VITE_QUICKBOOKS_ENVIRONMENT=sandbox{'\n'}
+                {'\n'}
+                # Server-side only (NOT VITE_ prefix - keeps secret hidden):{'\n'}
+                QUICKBOOKS_CLIENT_ID=...{'\n'}
+                QUICKBOOKS_CLIENT_SECRET=...{'\n'}
+                QUICKBOOKS_REDIRECT_URI={window.location.origin}/Settings?tab=quickbooks
+              </code>
+              <a
+                href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-yellow-800 hover:underline mt-2 font-medium"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Get API credentials from Intuit Developer
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security Badge */}
+      {hasCreds && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
+          <p className="text-xs text-green-700">
+            <strong>Secure:</strong> Token exchange happens server-side. Client secret is never exposed to the browser.
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -322,155 +329,192 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
         </div>
       </div>
 
-      {/* Export Options */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Customer Export */}
-        <div className="clay-card rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-blue-500" />
-            <h3 className="font-bold text-gray-800">Customer Export</h3>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              onClick={exportCustomersIIF}
-              className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600"
-            >
-              <Download className="w-4 h-4" />
-              Export as IIF (QuickBooks Desktop)
-            </Button>
-
-            <Button
-              onClick={exportCustomersCSV}
-              className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600"
-            >
-              <Download className="w-4 h-4" />
-              Export as CSV (QuickBooks Online)
-            </Button>
-          </div>
-
-          <p className="text-xs text-gray-400 mt-3">
-            Export {clients.length} customers to QuickBooks format
-          </p>
-        </div>
-
-        {/* Invoice Export */}
-        <div className="clay-card rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-5 h-5 text-green-500" />
-            <h3 className="font-bold text-gray-800">Invoice Export</h3>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              onClick={() => exportInvoicesIIF('all')}
-              className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-green-600"
-            >
-              <Download className="w-4 h-4" />
-              Export All as IIF
-            </Button>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={() => exportInvoicesIIF('Paid')}
-                className="clay-button rounded-xl py-2 flex items-center justify-center gap-1.5 text-sm text-green-600"
-              >
-                <Check className="w-3 h-3" />
-                Paid Only
-              </Button>
-              <Button
-                onClick={() => exportInvoicesIIF('Sent')}
-                className="clay-button rounded-xl py-2 flex items-center justify-center gap-1.5 text-sm text-orange-600"
-              >
-                <FileText className="w-3 h-3" />
-                Unpaid Only
-              </Button>
-            </div>
-
-            <Button
-              onClick={exportInvoicesCSV}
-              className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-green-600"
-            >
-              <Download className="w-4 h-4" />
-              Export as CSV
-            </Button>
-          </div>
-
-          <p className="text-xs text-gray-400 mt-3">
-            {paidInvoices.length} paid, {unpaidInvoices.length} outstanding
-          </p>
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200 pb-2">
+        <button
+          onClick={() => setActiveTab('sync')}
+          className={`px-4 py-2 rounded-xl font-medium transition-all ${
+            activeTab === 'sync' ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <RefreshCw className="w-4 h-4 inline mr-2" />
+          Live Sync
+        </button>
+        <button
+          onClick={() => setActiveTab('export')}
+          className={`px-4 py-2 rounded-xl font-medium transition-all ${
+            activeTab === 'export' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Download className="w-4 h-4 inline mr-2" />
+          Manual Export
+        </button>
       </div>
 
-      {/* Settings */}
-      <div className="clay-card rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings className="w-5 h-5 text-gray-500" />
-          <h3 className="font-bold text-gray-800">Sync Settings</h3>
-        </div>
-
+      {/* Live Sync Tab */}
+      {activeTab === 'sync' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-gray-700 font-medium">Auto-Sync</Label>
-              <p className="text-sm text-gray-500">Automatically remind to sync data</p>
-            </div>
-            <Switch
-              checked={settings.autoSync}
-              onCheckedChange={(checked) => saveSettings({ ...settings, autoSync: checked })}
-            />
-          </div>
+          {connectionInfo.isConnected ? (
+            <>
+              <div className="clay-card rounded-2xl p-5">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-green-500" />
+                  Sync to QuickBooks
+                </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-gray-700 font-medium mb-2 block">Accounts Receivable Account</Label>
-              <Input
-                value={settings.accountsReceivable}
-                onChange={(e) => setSettings({ ...settings, accountsReceivable: e.target.value })}
-                onBlur={() => saveSettings(settings)}
-                className="clay-button rounded-xl border-0"
-                placeholder="Accounts Receivable"
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 font-medium mb-2 block">Services Income Account</Label>
-              <Input
-                value={settings.servicesIncome}
-                onChange={(e) => setSettings({ ...settings, servicesIncome: e.target.value })}
-                onBlur={() => saveSettings(settings)}
-                className="clay-button rounded-xl border-0"
-                placeholder="Services Income"
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Button
+                    onClick={handleSyncAll}
+                    disabled={syncing}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl py-3 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                  >
+                    {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Sync All
+                  </Button>
+                  <Button
+                    onClick={handleSyncCustomers}
+                    disabled={syncing}
+                    className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600 disabled:opacity-50"
+                  >
+                    <Users className="w-4 h-4" />
+                    Sync Customers
+                  </Button>
+                  <Button
+                    onClick={handleSyncInvoices}
+                    disabled={syncing}
+                    className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-purple-600 disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Sync Invoices
+                  </Button>
+                </div>
 
-          {settings.lastSync && (
-            <div className="flex items-center gap-2 text-sm text-gray-500 pt-2">
-              <Calendar className="w-4 h-4" />
-              Last synced: {new Date(settings.lastSync).toLocaleString()}
+                <p className="text-xs text-gray-400 mt-3">
+                  Creates new records in QuickBooks. Duplicates (by name / invoice #) are skipped.
+                </p>
+              </div>
+
+              {syncResults && (
+                <div className="clay-card rounded-2xl p-5">
+                  <h3 className="font-bold text-gray-800 mb-3">Last Sync Results</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-blue-50 rounded-xl p-3">
+                      <p className="text-sm text-blue-600 font-medium">Customers</p>
+                      <p className="text-xl font-bold text-blue-700">{syncResults.customers.created} created</p>
+                      <p className="text-xs text-blue-500">
+                        {syncResults.customers.skipped} skipped
+                        {syncResults.customers.errors.length > 0 && `, ${syncResults.customers.errors.length} errors`}
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 rounded-xl p-3">
+                      <p className="text-sm text-purple-600 font-medium">Invoices</p>
+                      <p className="text-xl font-bold text-purple-700">{syncResults.invoices.created} created</p>
+                      <p className="text-xs text-purple-500">
+                        {syncResults.invoices.skipped} skipped
+                        {syncResults.invoices.errors.length > 0 && `, ${syncResults.invoices.errors.length} errors`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="clay-card rounded-2xl p-8 text-center">
+              <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-700 mb-2">Connect to QuickBooks</h3>
+              <p className="text-gray-500 mb-4">
+                Link your QuickBooks Online account to sync customers and invoices automatically.
+              </p>
+              {hasCreds ? (
+                <Button
+                  onClick={handleConnect}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-6 py-3 inline-flex items-center gap-2 font-semibold"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  Connect to QuickBooks
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <p className="text-sm text-orange-600">Configure API credentials above to enable connection</p>
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Manual Export Tab */}
+      {activeTab === 'export' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="clay-card rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-5 h-5 text-blue-500" />
+              <h3 className="font-bold text-gray-800">Customer Export</h3>
+            </div>
+            <div className="space-y-3">
+              <Button
+                onClick={exportCustomersIIF}
+                className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600"
+              >
+                <Download className="w-4 h-4" />
+                Export as IIF (Desktop)
+              </Button>
+              <Button
+                onClick={exportCustomersCSV}
+                className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600"
+              >
+                <Download className="w-4 h-4" />
+                Export as CSV (Online)
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">Export {clients.length} customers</p>
+          </div>
+
+          <div className="clay-card rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="w-5 h-5 text-green-500" />
+              <h3 className="font-bold text-gray-800">Invoice Export</h3>
+            </div>
+            <div className="space-y-3">
+              <Button
+                onClick={exportInvoicesIIF}
+                className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-green-600"
+              >
+                <Download className="w-4 h-4" />
+                Export as IIF (Desktop)
+              </Button>
+              <Button
+                onClick={exportInvoicesCSV}
+                className="w-full clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-green-600"
+              >
+                <Download className="w-4 h-4" />
+                Export as CSV (Online)
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              {paidInvoices.length} paid, {unpaidInvoices.length} outstanding
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Help */}
       <div className="bg-blue-50 rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-blue-700 mb-1">How to Import</p>
+            <p className="font-medium text-blue-700 mb-1">How it works</p>
             <ul className="text-blue-600 space-y-1">
-              <li><strong>QuickBooks Desktop:</strong> File &gt; Utilities &gt; Import &gt; IIF Files</li>
-              <li><strong>QuickBooks Online:</strong> Settings &gt; Import Data &gt; Customers/Invoices</li>
+              <li><strong>Live Sync:</strong> Connect once, then push data via QuickBooks API</li>
+              <li><strong>Manual Export:</strong> Download IIF/CSV files and import them into QuickBooks</li>
             </ul>
             <a
-              href="https://quickbooks.intuit.com/learn-support/en-us/help-article/import-export/import-iif-files-quickbooks-desktop/L3oC1W3l3_US_en_US"
+              href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-blue-700 hover:underline mt-2"
             >
               <ExternalLink className="w-3 h-3" />
-              QuickBooks Import Guide
+              QuickBooks API Documentation
             </a>
           </div>
         </div>
