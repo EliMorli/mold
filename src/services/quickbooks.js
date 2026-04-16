@@ -421,15 +421,77 @@ export async function getQBExpenses() {
   return data.QueryResponse?.Purchase || [];
 }
 
+// Cache for QB accounts to avoid repeated queries
+let cachedAccounts = null;
+let accountsCacheTime = 0;
+const ACCOUNTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getQBAccounts() {
+  if (cachedAccounts && Date.now() - accountsCacheTime < ACCOUNTS_CACHE_TTL) {
+    return cachedAccounts;
+  }
+  const data = await qbRequest('/query?query=' + encodeURIComponent('SELECT * FROM Account MAXRESULTS 1000'));
+  cachedAccounts = data.QueryResponse?.Account || [];
+  accountsCacheTime = Date.now();
+  return cachedAccounts;
+}
+
+async function findBankAccount() {
+  const accounts = await getQBAccounts();
+  // Priority: Bank accounts first, then Credit Card, then Other Current Asset
+  const bankAccount = accounts.find(a => a.AccountType === 'Bank' && a.Active !== false);
+  if (bankAccount) return { value: bankAccount.Id, name: bankAccount.Name };
+
+  const creditCard = accounts.find(a => a.AccountType === 'Credit Card' && a.Active !== false);
+  if (creditCard) return { value: creditCard.Id, name: creditCard.Name };
+
+  const otherAsset = accounts.find(a => a.AccountType === 'Other Current Asset' && a.Active !== false);
+  if (otherAsset) return { value: otherAsset.Id, name: otherAsset.Name };
+
+  throw new Error('No valid bank account found in QuickBooks. Please create a Bank account first.');
+}
+
+async function findExpenseAccount(category) {
+  const accounts = await getQBAccounts();
+  // Map app categories to QB expense account types
+  const categoryMap = {
+    'Lab Fees': ['Cost of Goods Sold', 'Expense'],
+    'Equipment': ['Fixed Asset', 'Expense'],
+    'Travel': ['Expense'],
+    'Marketing': ['Expense'],
+    'Office Supplies': ['Expense'],
+    'Insurance': ['Expense'],
+    'Utilities': ['Expense'],
+    'Salaries': ['Expense'],
+    'Other': ['Expense'],
+  };
+
+  const preferredTypes = categoryMap[category] || ['Expense'];
+
+  for (const acctType of preferredTypes) {
+    const expenseAccount = accounts.find(a => a.AccountType === acctType && a.Active !== false);
+    if (expenseAccount) return { value: expenseAccount.Id, name: expenseAccount.Name };
+  }
+
+  // Fallback: any expense-type account
+  const anyExpense = accounts.find(a =>
+    ['Expense', 'Cost of Goods Sold', 'Other Expense'].includes(a.AccountType) && a.Active !== false
+  );
+  if (anyExpense) return { value: anyExpense.Id, name: anyExpense.Name };
+
+  throw new Error('No valid expense account found in QuickBooks. Please create an Expense account first.');
+}
+
 // Tag embedded in PrivateNote to identify expenses created from this app
 const APP_EXPENSE_TAG = (id) => `[MoldApp:${id}]`;
 
 export async function createQBExpense(expense) {
-  // QuickBooks requires an AccountRef for the bank/payment account.
-  // We'll use a generic "Cash on Hand" or "Checking" approach - account ID 1 is usually the primary.
-  // In production, this would be configurable per company.
-  // NOTE: DocNumber on Purchase is limited to 21 chars; our UUIDs are 36 chars,
-  // so we embed the app ID in PrivateNote instead for later dedup lookup.
+  // Get valid accounts from QuickBooks
+  const [bankAccount, expenseAccount] = await Promise.all([
+    findBankAccount(),
+    findExpenseAccount(expense.category),
+  ]);
+
   const notePieces = [
     APP_EXPENSE_TAG(expense.id),
     expense.category,
@@ -439,13 +501,13 @@ export async function createQBExpense(expense) {
 
   const qbPurchase = {
     PaymentType: 'Cash',
-    AccountRef: { value: '1' }, // Primary checking/cash account (varies by company)
+    AccountRef: bankAccount,
     TxnDate: expense.date ? new Date(expense.date).toISOString().split('T')[0] : undefined,
     Line: [{
       Amount: parseFloat(expense.amount) || 0,
       DetailType: 'AccountBasedExpenseLineDetail',
       AccountBasedExpenseLineDetail: {
-        AccountRef: { value: '1' }, // Expense account - would be mapped by category in production
+        AccountRef: expenseAccount,
       },
       Description: (expense.description || expense.category || 'Expense').slice(0, 4000),
     }],
