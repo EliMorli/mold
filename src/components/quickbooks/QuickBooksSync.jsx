@@ -113,11 +113,19 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
     }
   };
 
-  const handleDisconnect = () => {
-    QB.clearTokens();
-    setConnectionInfo({ isConnected: false });
-    setSyncResults(null);
-    toast.success('Disconnected from QuickBooks');
+  const handleDisconnect = async () => {
+    try {
+      await QB.disconnect();
+      setConnectionInfo({ isConnected: false });
+      setSyncResults(null);
+      toast.success('Disconnected from QuickBooks. Next connect will prompt for company selection.');
+    } catch (e) {
+      // Fallback: clear local tokens even if revoke fails
+      QB.clearTokens();
+      setConnectionInfo({ isConnected: false });
+      setSyncResults(null);
+      toast.success('Disconnected locally');
+    }
   };
 
   const handleSyncAll = async () => {
