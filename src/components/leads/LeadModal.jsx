@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-export default function LeadModal({ lead, onClose, onSave, onConvertToClient, converting = false }) {
+export default function LeadModal({ lead, onClose, onSave, onConvertToClient, converting = false, saving = false }) {
   const [formData, setFormData] = useState({
     client_name: '',
     phone: '',
@@ -339,9 +339,10 @@ export default function LeadModal({ lead, onClose, onSave, onConvertToClient, co
               </Button>
               <Button
                 type="submit"
-                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
+                disabled={saving}
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {lead ? 'Update Lead' : 'Create Lead'}
+                {saving ? 'Saving...' : (lead ? 'Update Lead' : 'Create Lead')}
               </Button>
             </div>
           </div>

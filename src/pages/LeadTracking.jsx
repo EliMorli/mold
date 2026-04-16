@@ -489,6 +489,7 @@ export default function LeadTracking() {
           }}
           onConvertToClient={(data) => convertMutation.mutate(data)}
           converting={convertMutation.isPending}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

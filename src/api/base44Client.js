@@ -414,6 +414,7 @@ const mockClient = {
     Document: createMockEntity('documents'),
     Message: createMockEntity('messages'),
     AppSettings: createMockEntity('settings'),
+    AuditLog: createMockEntity('audit_log'),
   },
   auth: {
     me: () => Promise.resolve({ id: 'demo', full_name: 'Demo Admin', email: 'demo@example.com', app_role: 'Admin' }),

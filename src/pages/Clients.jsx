@@ -240,6 +240,7 @@ export default function ClientsPage() {
               createMutation.mutate(data);
             }
           }}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

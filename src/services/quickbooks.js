@@ -195,28 +195,51 @@ export async function testConnection() {
 
 // ============ API calls (routed through /api/quickbooks/proxy to avoid CORS) ============
 
-async function qbRequest(endpoint, options = {}) {
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function qbRequest(endpoint, options = {}, _attempt = 0) {
+  const MAX_RETRIES = 3;
+  const BACKOFF_MS = [1000, 2000, 4000]; // Exponential backoff
+
   const accessToken = await getAccessToken();
   if (!accessToken) throw new Error('Not connected to QuickBooks');
 
   const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
 
-  const response = await fetch('/api/quickbooks/proxy', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      endpoint,
-      method: options.method || 'GET',
-      body: options.body ? JSON.parse(options.body) : undefined,
-      accessToken,
-      realmId,
-      environment: QB_CONFIG.environment,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch('/api/quickbooks/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint,
+        method: options.method || 'GET',
+        body: options.body ? JSON.parse(options.body) : undefined,
+        accessToken,
+        realmId,
+        environment: QB_CONFIG.environment,
+      }),
+    });
+  } catch (networkError) {
+    // Network failure (offline, DNS, timeout) - retry with backoff
+    if (_attempt < MAX_RETRIES) {
+      console.warn(`[QB] Network error, retrying in ${BACKOFF_MS[_attempt]}ms...`, networkError.message);
+      await sleep(BACKOFF_MS[_attempt]);
+      return qbRequest(endpoint, options, _attempt + 1);
+    }
+    throw new Error(`Network error after ${MAX_RETRIES} retries: ${networkError.message}`);
+  }
 
   if (response.status === 401) {
     await refreshAccessToken();
-    return qbRequest(endpoint, options);
+    return qbRequest(endpoint, options, 0); // Reset retry count after token refresh
+  }
+
+  // Retry on 5xx server errors or rate limits (429)
+  if ((response.status >= 500 || response.status === 429) && _attempt < MAX_RETRIES) {
+    console.warn(`[QB] Server error ${response.status}, retrying in ${BACKOFF_MS[_attempt]}ms...`);
+    await sleep(BACKOFF_MS[_attempt]);
+    return qbRequest(endpoint, options, _attempt + 1);
   }
 
   if (!response.ok) {
@@ -391,11 +414,82 @@ export async function syncInvoicesToQB(invoices) {
   return results;
 }
 
-export async function performFullSync(customers, invoices) {
-  return {
+// ============ Expense Sync ============
+
+export async function getQBExpenses() {
+  const data = await qbRequest('/query?query=' + encodeURIComponent('SELECT * FROM Purchase MAXRESULTS 1000'));
+  return data.QueryResponse?.Purchase || [];
+}
+
+export async function createQBExpense(expense) {
+  // QuickBooks requires an AccountRef for the bank/payment account.
+  // We'll use a generic "Cash on Hand" or "Checking" approach - account ID 1 is usually the primary.
+  // In production, this would be configurable per company.
+  const qbPurchase = {
+    PaymentType: 'Cash',
+    AccountRef: { value: '1' }, // Primary checking/cash account (varies by company)
+    TxnDate: expense.date ? new Date(expense.date).toISOString().split('T')[0] : undefined,
+    Line: [{
+      Amount: parseFloat(expense.amount) || 0,
+      DetailType: 'AccountBasedExpenseLineDetail',
+      AccountBasedExpenseLineDetail: {
+        AccountRef: { value: '1' }, // Expense account - would be mapped by category in production
+      },
+      Description: expense.description || expense.category || 'Expense',
+    }],
+    PrivateNote: [expense.category, expense.vendor, expense.notes].filter(Boolean).join(' | '),
+    DocNumber: expense.id, // Use app ID as reference
+  };
+
+  const data = await qbRequest('/purchase', {
+    method: 'POST',
+    body: JSON.stringify(qbPurchase),
+  });
+  return data.Purchase;
+}
+
+export async function syncExpensesToQB(expenses) {
+  const results = { created: 0, skipped: 0, errors: [] };
+  const existing = await getQBExpenses();
+
+  // Build map by DocNumber (we use expense.id as DocNumber)
+  const existingByDocNum = new Map();
+  existing.forEach(e => {
+    if (e.DocNumber) existingByDocNum.set(e.DocNumber, e);
+  });
+
+  for (const exp of expenses) {
+    try {
+      if (exp.qb_id || existingByDocNum.has(exp.id)) {
+        // Already synced
+        if (!exp.qb_id && existingByDocNum.has(exp.id)) {
+          const qbExp = existingByDocNum.get(exp.id);
+          await base44.entities.Expense.update(exp.id, { qb_id: qbExp.Id, qb_sync_token: qbExp.SyncToken });
+        }
+        results.skipped++;
+        continue;
+      }
+      const created = await createQBExpense(exp);
+      if (created && exp.id) {
+        await base44.entities.Expense.update(exp.id, { qb_id: created.Id, qb_sync_token: created.SyncToken });
+      }
+      results.created++;
+    } catch (e) {
+      results.errors.push({ description: exp.description, error: e.message });
+    }
+  }
+  return results;
+}
+
+export async function performFullSync(customers, invoices, expenses = []) {
+  const results = {
     customers: await syncCustomersToQB(customers),
     invoices: await syncInvoicesToQB(invoices),
   };
+  if (expenses.length > 0) {
+    results.expenses = await syncExpensesToQB(expenses);
+  }
+  return results;
 }
 
 // ============ Import FROM QuickBooks (pull direction) ============

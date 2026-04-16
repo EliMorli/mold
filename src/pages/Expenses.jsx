@@ -258,6 +258,7 @@ export default function ExpensesPage() {
               createMutation.mutate(data);
             }
           }}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>

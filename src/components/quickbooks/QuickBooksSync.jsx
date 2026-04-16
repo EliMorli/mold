@@ -81,7 +81,7 @@ const downloadFile = (content, filename, contentType) => {
 const formatDateForFile = () => new Date().toISOString().split('T')[0];
 
 // ---------- Main component ----------
-export default function QuickBooksSync({ clients = [], invoices = [], isLoading = false }) {
+export default function QuickBooksSync({ clients = [], invoices = [], expenses = [], isLoading = false }) {
   const queryClient = useQueryClient();
   const [connectionInfo, setConnectionInfo] = useState(QB.getConnectionInfo());
   const [syncing, setSyncing] = useState(false);
@@ -94,7 +94,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
 
   const hasCreds = QB.hasCredentials();
-  const hasData = clients.length > 0 || invoices.length > 0;
+  const hasData = clients.length > 0 || invoices.length > 0 || expenses.length > 0;
   const isEmpty = !isLoading && !hasData;
 
   // Refresh data by invalidating React Query cache
@@ -219,7 +219,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
     setSyncing(true);
     setSyncResults(null);
     try {
-      const results = await QB.performFullSync(clients, invoices);
+      const results = await QB.performFullSync(clients, invoices, expenses);
       setSyncResults(results);
       const totalCreated = results.customers.created + results.invoices.created;
       const totalErrors = results.customers.errors.length + results.invoices.errors.length;
@@ -719,7 +719,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
                     Sync to QuickBooks
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{clients.length} customers · {invoices.length} invoices ready</span>
+                    <span>{clients.length} customers · {invoices.length} invoices · {expenses.length} expenses ready</span>
                     <button
                       onClick={handleRefreshData}
                       disabled={refreshing}

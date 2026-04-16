@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-export default function TechnicianModal({ technician, onClose, onSave }) {
+export default function TechnicianModal({ technician, onClose, onSave, saving = false }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -255,9 +255,10 @@ export default function TechnicianModal({ technician, onClose, onSave }) {
             </Button>
             <Button
               type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-orange-600 hover:scale-105 transition-transform"
+              disabled={saving}
+              className="clay-button rounded-2xl px-6 py-3 font-semibold text-orange-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {technician ? 'Update' : 'Create & Send Invitation'} 
+              {saving ? 'Saving...' : (technician ? 'Update' : 'Create & Send Invitation')}
             </Button>
           </div>
         </form>

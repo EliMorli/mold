@@ -566,6 +566,7 @@ export default function TechnicianProfilePage() {
           }}
           onClose={() => setShowPayrollModal(false)}
           onSave={(data) => createExpenseMutation.mutate(data)}
+          saving={createExpenseMutation.isPending}
         />
       )}
     </div>

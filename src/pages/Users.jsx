@@ -281,6 +281,7 @@ export default function UsersPage() {
             setShowModal(false);
             setSelectedUser(null);
           } : null}
+          saving={createMutation.isPending || updateMutation.isPending}
         />
       )}
     </div>
