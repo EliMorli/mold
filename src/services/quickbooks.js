@@ -124,6 +124,31 @@ export function clearTokens() {
   Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
 }
 
+/**
+ * Fully disconnect: revoke token on Intuit's side + clear local storage.
+ * This forces a fresh login and company selection on the next connect.
+ */
+export async function disconnect() {
+  const refreshToken = localStorage.getItem(STORAGE_KEYS.refreshToken);
+  const accessToken = localStorage.getItem(STORAGE_KEYS.accessToken);
+  const token = refreshToken || accessToken;
+
+  // Try to revoke on Intuit's side (best effort - don't block on failure)
+  if (token) {
+    try {
+      await fetch('/api/quickbooks/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+    } catch (e) {
+      console.warn('Failed to revoke token on Intuit side:', e);
+    }
+  }
+
+  clearTokens();
+}
+
 export function isConnected() {
   return !!localStorage.getItem(STORAGE_KEYS.accessToken);
 }
