@@ -299,19 +299,21 @@ export async function syncCustomersToQB(customers) {
   const results = { created: 0, skipped: 0, errors: [] };
   const existing = await getQBCustomers();
 
-  // Build map of existing QB customers by display name (case-insensitive)
+  // Build map of existing QB customers by normalized name (trimmed + lowercase)
+  const normalizeName = (n) => (n || '').trim().toLowerCase();
   const existingByName = new Map();
   existing.forEach(c => {
-    if (c.DisplayName) existingByName.set(c.DisplayName.toLowerCase(), c);
+    if (c.DisplayName) existingByName.set(normalizeName(c.DisplayName), c);
+    if (c.CompanyName) existingByName.set(normalizeName(c.CompanyName), c);
   });
 
   for (const c of customers) {
     try {
-      const nameLower = c.name?.toLowerCase();
-      if (nameLower && existingByName.has(nameLower)) {
+      const nameKey = normalizeName(c.name);
+      if (nameKey && existingByName.has(nameKey)) {
         // Customer already exists in QB - link app client to QB ID if not already linked
         if (!c.qb_id && c.id) {
-          const qbCust = existingByName.get(nameLower);
+          const qbCust = existingByName.get(nameKey);
           await base44.entities.Client.update(c.id, { qb_id: qbCust.Id, qb_sync_token: qbCust.SyncToken });
         }
         results.skipped++;
@@ -327,6 +329,25 @@ export async function syncCustomersToQB(customers) {
       }
       results.created++;
     } catch (e) {
+      // Handle QB duplicate name error gracefully - treat as skipped
+      if (e.message && /duplicate name/i.test(e.message)) {
+        // Try to find the existing customer with a fresh query and link
+        try {
+          const freshList = await getQBCustomers();
+          const existingCust = freshList.find(qc =>
+            normalizeName(qc.DisplayName) === normalizeName(c.name) ||
+            normalizeName(qc.CompanyName) === normalizeName(c.name)
+          );
+          if (existingCust && c.id) {
+            await base44.entities.Client.update(c.id, {
+              qb_id: existingCust.Id,
+              qb_sync_token: existingCust.SyncToken
+            });
+          }
+        } catch (_) { /* best effort */ }
+        results.skipped++;
+        continue;
+      }
       results.errors.push({ name: c.name, error: e.message });
     }
   }
@@ -341,12 +362,30 @@ export async function getQBInvoices() {
 }
 
 async function findOrCreateCustomer(name, email) {
-  const query = encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName = '${(name || '').replace(/'/g, "\\'")}'`);
-  const data = await qbRequest(`/query?query=${query}`);
-  if (data.QueryResponse?.Customer?.length > 0) {
-    return data.QueryResponse.Customer[0];
+  const normalized = (name || '').trim();
+  // Fetch all customers and match with trim + case-insensitive (QB names can have
+  // trailing whitespace or varying case that exact-match queries miss).
+  const allCustomers = await getQBCustomers();
+  const match = allCustomers.find(c =>
+    (c.DisplayName || '').trim().toLowerCase() === normalized.toLowerCase() ||
+    (c.CompanyName || '').trim().toLowerCase() === normalized.toLowerCase()
+  );
+  if (match) return match;
+
+  try {
+    return await createQBCustomer({ name: normalized, email });
+  } catch (e) {
+    // If QB says duplicate, re-fetch and find the existing one
+    if (e.message && /duplicate name/i.test(e.message)) {
+      const fresh = await getQBCustomers();
+      const existing = fresh.find(c =>
+        (c.DisplayName || '').trim().toLowerCase() === normalized.toLowerCase() ||
+        (c.CompanyName || '').trim().toLowerCase() === normalized.toLowerCase()
+      );
+      if (existing) return existing;
+    }
+    throw e;
   }
-  return await createQBCustomer({ name, email });
 }
 
 // Cache for service items
@@ -458,6 +497,22 @@ export async function syncInvoicesToQB(invoices) {
       }
       results.created++;
     } catch (e) {
+      // Treat duplicate-name/docnumber errors as skipped (already exists in QB)
+      if (e.message && /duplicate (name|document)|already exists/i.test(e.message)) {
+        // Try to find the existing QB invoice and link it
+        try {
+          const fresh = await getQBInvoices();
+          const match = fresh.find(qi => qi.DocNumber === inv.invoice_number);
+          if (match && inv.id) {
+            await base44.entities.Invoice.update(inv.id, {
+              qb_id: match.Id,
+              qb_sync_token: match.SyncToken,
+            });
+          }
+        } catch (_) { /* best effort */ }
+        results.skipped++;
+        continue;
+      }
       results.errors.push({ number: inv.invoice_number, error: e.message });
     }
   }
@@ -486,19 +541,30 @@ async function getQBAccounts() {
   return cachedAccounts;
 }
 
-async function findBankAccount() {
+async function findPaymentAccount() {
   const accounts = await getQBAccounts();
-  // Priority: Bank accounts first, then Credit Card, then Other Current Asset
+  // For Purchase entity, QB requires:
+  //   PaymentType='Cash' or 'Check' -> AccountRef must be Bank type
+  //   PaymentType='CreditCard' -> AccountRef must be Credit Card type
   const bankAccount = accounts.find(a => a.AccountType === 'Bank' && a.Active !== false);
-  if (bankAccount) return { value: bankAccount.Id, name: bankAccount.Name };
+  if (bankAccount) {
+    return {
+      paymentType: 'Cash',
+      accountRef: { value: bankAccount.Id, name: bankAccount.Name },
+    };
+  }
 
   const creditCard = accounts.find(a => a.AccountType === 'Credit Card' && a.Active !== false);
-  if (creditCard) return { value: creditCard.Id, name: creditCard.Name };
+  if (creditCard) {
+    return {
+      paymentType: 'CreditCard',
+      accountRef: { value: creditCard.Id, name: creditCard.Name },
+    };
+  }
 
-  const otherAsset = accounts.find(a => a.AccountType === 'Other Current Asset' && a.Active !== false);
-  if (otherAsset) return { value: otherAsset.Id, name: otherAsset.Name };
-
-  throw new Error('No valid bank account found in QuickBooks. Please create a Bank account first.');
+  const accountTypes = [...new Set(accounts.map(a => a.AccountType))];
+  console.error('[QB] No Bank/CreditCard account found. Available types:', accountTypes);
+  throw new Error(`No Bank or Credit Card account in QuickBooks. Available types: ${accountTypes.join(', ')}. Please create a Bank account.`);
 }
 
 async function findExpenseAccount(category) {
@@ -541,9 +607,9 @@ async function findExpenseAccount(category) {
 const APP_EXPENSE_TAG = (id) => `[MoldApp:${id}]`;
 
 export async function createQBExpense(expense) {
-  // Get valid accounts from QuickBooks
-  const [bankAccount, expenseAccount] = await Promise.all([
-    findBankAccount(),
+  // Get valid accounts from QuickBooks (payment account determines PaymentType)
+  const [payment, expenseAccount] = await Promise.all([
+    findPaymentAccount(),
     findExpenseAccount(expense.category),
   ]);
 
@@ -555,8 +621,8 @@ export async function createQBExpense(expense) {
   ].filter(Boolean);
 
   const qbPurchase = {
-    PaymentType: 'Cash',
-    AccountRef: bankAccount,
+    PaymentType: payment.paymentType,
+    AccountRef: payment.accountRef,
     TxnDate: expense.date ? new Date(expense.date).toISOString().split('T')[0] : undefined,
     Line: [{
       Amount: parseFloat(expense.amount) || 0,
@@ -568,6 +634,13 @@ export async function createQBExpense(expense) {
     }],
     PrivateNote: notePieces.join(' | ').slice(0, 4000),
   };
+
+  console.log('[QB] Creating expense with:', {
+    PaymentType: payment.paymentType,
+    BankAccount: payment.accountRef,
+    ExpenseAccount: expenseAccount,
+    Category: expense.category,
+  });
 
   const data = await qbRequest('/purchase', {
     method: 'POST',
