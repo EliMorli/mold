@@ -74,17 +74,21 @@ export default function SettingsPage() {
     },
   });
 
-  // QuickBooks data
-  const { data: clients = [] } = useQuery({
+  // QuickBooks data - force fresh fetch on mount since user may land here from OAuth redirect
+  const { data: clients = [], isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => base44.entities.Client.list(),
     initialData: [],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
-  const { data: invoices = [] } = useQuery({
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => base44.entities.Invoice.list(),
     initialData: [],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const [calendarSettings, setCalendarSettings] = useState({
@@ -1086,7 +1090,11 @@ export default function SettingsPage() {
 
       {/* QuickBooks Tab */}
       {activeTab === 'quickbooks' && (
-        <QuickBooksSync clients={clients} invoices={invoices} />
+        <QuickBooksSync
+          clients={clients}
+          invoices={invoices}
+          isLoading={clientsLoading || invoicesLoading}
+        />
       )}
     </div>
   );

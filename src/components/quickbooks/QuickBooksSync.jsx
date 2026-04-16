@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   RefreshCw,
   Download,
@@ -20,12 +21,15 @@ import {
   Copy,
   Hash,
   TestTube,
-  Eye
+  Eye,
+  Database,
+  RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
+import { reloadDemoData } from "@/api/base44Client";
 
 // ---------- IIF/CSV fallback helpers ----------
 const generateIIF = {
@@ -73,16 +77,64 @@ const downloadFile = (content, filename, contentType) => {
 const formatDateForFile = () => new Date().toISOString().split('T')[0];
 
 // ---------- Main component ----------
-export default function QuickBooksSync({ clients = [], invoices = [] }) {
+export default function QuickBooksSync({ clients = [], invoices = [], isLoading = false }) {
+  const queryClient = useQueryClient();
   const [connectionInfo, setConnectionInfo] = useState(QB.getConnectionInfo());
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [syncResults, setSyncResults] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
 
   const hasCreds = QB.hasCredentials();
+  const hasData = clients.length > 0 || invoices.length > 0;
+  const isEmpty = !isLoading && !hasData;
+
+  // Refresh data by invalidating React Query cache
+  const handleRefreshData = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['clients'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+      ]);
+      toast.success('Data refreshed');
+    } catch (e) {
+      toast.error('Refresh failed: ' + e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Force reload demo data into localStorage + refresh queries
+  const handleReloadDemoData = async () => {
+    if (!window.confirm('This will overwrite any custom records with the original demo data. Continue?')) {
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const ok = reloadDemoData();
+      if (!ok) throw new Error('Failed to reload demo data');
+
+      // Invalidate all relevant queries so they refetch
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['clients'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+        queryClient.invalidateQueries({ queryKey: ['tests'] }),
+        queryClient.invalidateQueries({ queryKey: ['technicians'] }),
+        queryClient.invalidateQueries({ queryKey: ['labs'] }),
+        queryClient.invalidateQueries({ queryKey: ['leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['expenses'] }),
+      ]);
+      toast.success('Demo data reloaded successfully');
+    } catch (e) {
+      toast.error('Reload failed: ' + e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Handle OAuth callback on mount
   useEffect(() => {
@@ -517,16 +569,78 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
                 )}
               </div>
 
+              {/* Loading state */}
+              {isLoading && (
+                <div className="rounded-2xl p-6 bg-blue-50 border-2 border-blue-200 flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-blue-800">Loading app data...</p>
+                    <p className="text-blue-600">Fetching customers and invoices to sync.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty data warning */}
+              {isEmpty && (
+                <div className="rounded-2xl p-5 bg-amber-50 border-2 border-amber-300">
+                  <div className="flex items-start gap-3 mb-4">
+                    <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-bold text-amber-900 text-lg">No Data to Sync</h3>
+                      <p className="text-sm text-amber-800 mt-1">
+                        Your app has <strong>0 customers</strong> and <strong>0 invoices</strong>. There's nothing to push to QuickBooks yet.
+                      </p>
+                      <p className="text-xs text-amber-700 mt-2">
+                        This can happen if the app data hasn't loaded yet, or if the local cache was cleared.
+                        Try refreshing first. If that doesn't help, click "Reload Demo Data" to restore the sample records.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleRefreshData}
+                      disabled={refreshing}
+                      className="clay-button rounded-xl px-4 py-2 flex items-center gap-2 text-blue-600 font-semibold disabled:opacity-50"
+                    >
+                      {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                      Refresh Data
+                    </Button>
+                    <Button
+                      onClick={handleReloadDemoData}
+                      disabled={refreshing}
+                      className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-4 py-2 flex items-center gap-2 font-semibold disabled:opacity-50"
+                    >
+                      {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                      Reload Demo Data
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="clay-card rounded-2xl p-5">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-green-500" />
-                  Sync to QuickBooks
-                </h3>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <RefreshCw className="w-5 h-5 text-green-500" />
+                    Sync to QuickBooks
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{clients.length} customers · {invoices.length} invoices ready</span>
+                    <button
+                      onClick={handleRefreshData}
+                      disabled={refreshing}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                      title="Refresh data from app"
+                    >
+                      {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Button
                     onClick={handleSyncAll}
-                    disabled={syncing}
+                    disabled={syncing || isEmpty}
+                    title={isEmpty ? 'No data to sync' : ''}
                     className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl py-3 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
                   >
                     {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -534,19 +648,21 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
                   </Button>
                   <Button
                     onClick={handleSyncCustomers}
-                    disabled={syncing}
+                    disabled={syncing || clients.length === 0}
+                    title={clients.length === 0 ? 'No customers to sync' : ''}
                     className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600 disabled:opacity-50"
                   >
                     <Users className="w-4 h-4" />
-                    Sync Customers
+                    Sync Customers ({clients.length})
                   </Button>
                   <Button
                     onClick={handleSyncInvoices}
-                    disabled={syncing}
+                    disabled={syncing || invoices.length === 0}
+                    title={invoices.length === 0 ? 'No invoices to sync' : ''}
                     className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-purple-600 disabled:opacity-50"
                   >
                     <FileText className="w-4 h-4" />
-                    Sync Invoices
+                    Sync Invoices ({invoices.length})
                   </Button>
                 </div>
 
