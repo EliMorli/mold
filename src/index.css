@@ -156,3 +156,27 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix for mobile dropdown/select touch handling */
+[data-radix-select-trigger],
+[data-radix-select-content],
+[data-radix-select-item],
+[data-radix-popper-content-wrapper],
+[data-radix-dropdown-menu-trigger],
+[data-radix-dropdown-menu-content],
+[data-radix-popover-trigger],
+[data-radix-popover-content] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure select content appears above all modals */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Prevent backdrop-blur from interfering with dropdowns */
+.backdrop-blur-sm [data-radix-select-content],
+.backdrop-blur [data-radix-select-content] {
+  isolation: isolate;
+}
