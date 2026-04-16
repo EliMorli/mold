@@ -279,9 +279,51 @@ export const reloadDemoData = () => {
 const saveData = (key, data) => {
   try {
     localStorage.setItem(`demo_${key}`, JSON.stringify(data));
+    return true;
   } catch (e) {
-    console.error('Failed to save to localStorage:', e);
+    console.error(`[Demo] Failed to save ${key} to localStorage:`, e);
+    // QuotaExceededError or serialization error - notify so UI can show the user
+    try {
+      window.dispatchEvent(new CustomEvent('base44:save-error', {
+        detail: { key, error: e.message || String(e) }
+      }));
+    } catch {}
+    return false;
   }
+};
+
+// Generate a unique id. Prefer crypto.randomUUID (collision-safe); fall back
+// to timestamp+random for older browsers.
+const generateId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+// Hook for side effects (e.g., QuickBooks auto-sync). Components register
+// callbacks via `registerEntityHook(entityKey, 'create' | 'update' | 'delete', fn)`.
+// Hooks run after successful save and errors are swallowed (best-effort).
+const ENTITY_HOOKS = { create: {}, update: {}, delete: {} };
+export const registerEntityHook = (key, op, fn) => {
+  if (!ENTITY_HOOKS[op]) return () => {};
+  if (!ENTITY_HOOKS[op][key]) ENTITY_HOOKS[op][key] = new Set();
+  ENTITY_HOOKS[op][key].add(fn);
+  return () => ENTITY_HOOKS[op][key]?.delete(fn);
+};
+const runHooks = (key, op, item) => {
+  const fns = ENTITY_HOOKS[op]?.[key];
+  if (!fns) return;
+  fns.forEach(fn => {
+    try {
+      const r = fn(item);
+      if (r && typeof r.catch === 'function') r.catch(e => console.error(`[Hook ${key}.${op}]`, e));
+    } catch (e) {
+      console.error(`[Hook ${key}.${op}]`, e);
+    }
+  });
 };
 
 // Map of all initial data by key
@@ -322,25 +364,30 @@ const createMockEntity = (key) => {
     },
     create: (newItem) => {
       const data = getStoredData(key, getInitialData());
-      const item = { id: Date.now().toString(), created_date: new Date().toISOString(), ...newItem };
+      const item = { id: generateId(), created_date: new Date().toISOString(), ...newItem };
       data.push(item);
-      saveData(key, data);
+      const ok = saveData(key, data);
+      if (!ok) return Promise.reject(new Error('Failed to save - storage may be full'));
+      runHooks(key, 'create', item);
       return Promise.resolve(item);
     },
     update: (id, updates) => {
       const data = getStoredData(key, getInitialData());
       const index = data.findIndex(item => item.id === id);
-      if (index !== -1) {
-        data[index] = { ...data[index], ...updates, updated_date: new Date().toISOString() };
-        saveData(key, data);
-        return Promise.resolve(data[index]);
-      }
-      return Promise.resolve(null);
+      if (index === -1) return Promise.resolve(null);
+      data[index] = { ...data[index], ...updates, updated_date: new Date().toISOString() };
+      const ok = saveData(key, data);
+      if (!ok) return Promise.reject(new Error('Failed to save - storage may be full'));
+      runHooks(key, 'update', data[index]);
+      return Promise.resolve(data[index]);
     },
     delete: (id) => {
       const data = getStoredData(key, getInitialData());
+      const removed = data.find(item => item.id === id);
       const filtered = data.filter(item => item.id !== id);
-      saveData(key, filtered);
+      const ok = saveData(key, filtered);
+      if (!ok) return Promise.reject(new Error('Failed to save - storage may be full'));
+      if (removed) runHooks(key, 'delete', removed);
       return Promise.resolve({ success: true });
     },
   };

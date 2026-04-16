@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
 import { reloadDemoData } from "@/api/base44Client";
+import { isAutoSyncEnabled, setAutoSyncEnabled } from "@/services/quickbooksAutoSync";
 
 // ---------- IIF/CSV fallback helpers ----------
 const generateIIF = {
@@ -90,6 +91,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
   const [syncResults, setSyncResults] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
+  const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
 
   const hasCreds = QB.hasCredentials();
   const hasData = clients.length > 0 || invoices.length > 0;
@@ -625,6 +627,41 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Auto-sync toggle */}
+              <div className="clay-card rounded-2xl p-5">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-green-500" />
+                      Automatic Sync
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      When enabled, new clients and invoices created in this app are pushed to QuickBooks automatically in the background.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !autoSync;
+                      setAutoSync(next);
+                      setAutoSyncEnabled(next);
+                      toast.success(next ? 'Auto-sync enabled' : 'Auto-sync disabled');
+                    }}
+                    className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                      autoSync ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
+                    role="switch"
+                    aria-checked={autoSync}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                        autoSync ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Loading state */}

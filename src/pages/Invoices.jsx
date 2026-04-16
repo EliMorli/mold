@@ -5,6 +5,7 @@ import { Plus, Search, Receipt, DollarSign, Calendar, User, Download } from "luc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import InvoiceModal from "../components/invoices/InvoiceModal";
 
 export default function InvoicesPage() {
@@ -36,20 +37,24 @@ export default function InvoicesPage() {
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Invoice.create(data),
-    onSuccess: () => {
+    onSuccess: (inv) => {
       queryClient.invalidateQueries(['invoices']);
       setShowModal(false);
       setSelectedInvoice(null);
+      toast.success(`Invoice created: ${inv?.invoice_number || ''}`);
     },
+    onError: (e) => toast.error('Failed to create invoice', { description: e.message }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Invoice.update(id, data),
-    onSuccess: () => {
+    onSuccess: (inv) => {
       queryClient.invalidateQueries(['invoices']);
       setShowModal(false);
       setSelectedInvoice(null);
+      toast.success(`Invoice updated: ${inv?.invoice_number || ''}`);
     },
+    onError: (e) => toast.error('Failed to update invoice', { description: e.message }),
   });
 
   const filteredInvoices = invoices.filter(invoice => {

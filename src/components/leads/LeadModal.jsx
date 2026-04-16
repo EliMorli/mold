@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, User, Phone, Mail, MapPin, DollarSign, FileText, CheckCircle } from "lucide-react";
+import { X, User, Phone, Mail, MapPin, DollarSign, FileText, CheckCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-export default function LeadModal({ lead, onClose, onSave }) {
+export default function LeadModal({ lead, onClose, onSave, onConvertToClient, converting = false }) {
   const [formData, setFormData] = useState({
     client_name: '',
     phone: '',
@@ -309,20 +309,41 @@ export default function LeadModal({ lead, onClose, onSave }) {
             />
           </div>
 
-          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              onClick={onClose}
-              className="clay-button rounded-2xl px-6 py-3 font-medium text-gray-600"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
-            >
-              {lead ? 'Update Lead' : 'Create Lead'}
-            </Button>
+          <div className="flex gap-3 justify-between flex-wrap pt-4 border-t border-gray-200">
+            <div>
+              {lead && onConvertToClient && !lead.converted_client_id && (
+                <Button
+                  type="button"
+                  onClick={() => onConvertToClient(formData)}
+                  disabled={converting}
+                  className="clay-button rounded-2xl px-6 py-3 font-semibold text-green-600 hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-60"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  {converting ? 'Converting...' : 'Convert to Client'}
+                </Button>
+              )}
+              {lead?.converted_client_id && (
+                <span className="text-sm text-green-600 flex items-center gap-1.5 px-3 py-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Already converted to client
+                </span>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                onClick={onClose}
+                className="clay-button rounded-2xl px-6 py-3 font-medium text-gray-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform"
+              >
+                {lead ? 'Update Lead' : 'Create Lead'}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
