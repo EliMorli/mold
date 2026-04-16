@@ -7,7 +7,12 @@ import '@/index.css'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      // Data is stored in localStorage (no network cost), so always consider it stale
+      // and refetch when components mount. This ensures page navigation always shows
+      // fresh data (e.g., going from ClientProfile back to Clients list).
+      staleTime: 0,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
       retry: 1,
     },
   },

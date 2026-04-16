@@ -193,7 +193,20 @@ export default function ClientProfilePage() {
 
   // Filter data for this client
   const clientTests = allTests.filter(test => test.client_id === clientId);
-  const clientInvoices = allInvoices.filter(inv => inv.client_id === clientId);
+  // Match invoices by client_id (primary) or by name/email as a fallback.
+  // This handles invoices imported from QuickBooks that may not yet have
+  // a proper client_id link.
+  const clientName = (client?.name || '').toLowerCase();
+  const clientEmail = (client?.email || '').toLowerCase();
+  const clientInvoices = allInvoices.filter(inv => {
+    if (inv.client_id && inv.client_id === clientId) return true;
+    if (!inv.client_id) {
+      const invName = (inv.client_name || '').toLowerCase();
+      if (clientName && invName === clientName) return true;
+      if (clientEmail && inv.client_email?.toLowerCase() === clientEmail) return true;
+    }
+    return false;
+  });
   
   // Calculate stats
   const totalTests = clientTests.length;

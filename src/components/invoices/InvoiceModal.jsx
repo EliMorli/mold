@@ -240,7 +240,7 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave,
                 <SelectTrigger className="clay-button rounded-2xl border-0">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="z-[60]">
+                <SelectContent>
                   <SelectItem value="Draft">Draft</SelectItem>
                   <SelectItem value="Sent">Sent</SelectItem>
                   <SelectItem value="Paid">Paid</SelectItem>
@@ -258,7 +258,7 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave,
                 <SelectTrigger className={`clay-button rounded-2xl border-0 ${errors.client_id ? 'ring-2 ring-red-400' : ''}`}>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
-                <SelectContent className="z-[60]">
+                <SelectContent>
                   {clients.map(client => (
                     <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                   ))}
@@ -275,7 +275,7 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave,
                 <SelectTrigger className="clay-button rounded-2xl border-0">
                   <SelectValue placeholder="Select test (optional)" />
                 </SelectTrigger>
-                <SelectContent className="z-[60]">
+                <SelectContent>
                   {tests.map(test => (
                     <SelectItem key={test.id} value={test.id}>
                       {test.test_number} - {test.client_name}
@@ -377,7 +377,7 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave,
                     <SelectTrigger className="clay-button rounded-2xl border-0">
                       <SelectValue placeholder="Select payment method" />
                     </SelectTrigger>
-                    <SelectContent className="z-[60]">
+                    <SelectContent>
                       <SelectItem value="Cash">Cash</SelectItem>
                       <SelectItem value="Check">Check</SelectItem>
                       <SelectItem value="Credit Card">Credit Card</SelectItem>
