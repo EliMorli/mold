@@ -237,9 +237,10 @@ const getStoredData = (key, initialData) => {
     const stored = localStorage.getItem(`demo_${key}`);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // If stored data is empty but we have initial data, use initial data
-      if (Array.isArray(parsed) && parsed.length === 0 && initialData.length > 0) {
-        console.log(`[Demo] ${key}: stored empty, using ${initialData.length} initial items`);
+      // Re-init if stored data is null, not an array, OR empty array with available initial data.
+      // This handles edge cases where localStorage has null, a string, or was corrupted.
+      if (!Array.isArray(parsed) || (parsed.length === 0 && initialData.length > 0)) {
+        console.log(`[Demo] ${key}: stored data invalid/empty, re-initializing with ${initialData.length} items`);
         localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
         return initialData;
       }
@@ -252,7 +253,26 @@ const getStoredData = (key, initialData) => {
     return initialData;
   } catch (e) {
     console.error(`[Demo] ${key} error:`, e);
+    // On parse errors, reset the key and return initial data
+    try { localStorage.setItem(`demo_${key}`, JSON.stringify(initialData)); } catch {}
     return initialData;
+  }
+};
+
+// Force re-initialization of all demo data (used by "Reload Demo Data" button in QuickBooks settings)
+export const reloadDemoData = () => {
+  try {
+    Object.keys(INITIAL_DATA_MAP).forEach(key => {
+      const initialData = INITIAL_DATA_MAP[key];
+      if (initialData && initialData.length > 0) {
+        localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
+        console.log(`[Demo] Reloaded ${key} with ${initialData.length} items`);
+      }
+    });
+    return true;
+  } catch (e) {
+    console.error('[Demo] Failed to reload demo data:', e);
+    return false;
   }
 };
 
