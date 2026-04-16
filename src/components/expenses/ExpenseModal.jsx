@@ -187,7 +187,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
           <SelectTrigger className="clay-button rounded-2xl border-0">
             <SelectValue placeholder="Select method" />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent>
             <SelectItem value="Cash">Cash</SelectItem>
             <SelectItem value="Check">Check</SelectItem>
             <SelectItem value="Credit Card">Credit Card</SelectItem>
@@ -203,7 +203,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
           <SelectTrigger className="clay-button rounded-2xl border-0">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent>
             <SelectItem value="Pending">Pending</SelectItem>
             <SelectItem value="Paid">Paid</SelectItem>
             <SelectItem value="Reimbursed">Reimbursed</SelectItem>
@@ -250,7 +250,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
           <SelectTrigger className="clay-button rounded-2xl border-0">
             <SelectValue placeholder="Select worker/employee" />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent>
             {technicians.map(tech => (
               <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
             ))}
@@ -324,7 +324,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
           <SelectTrigger className="clay-button rounded-2xl border-0">
             <SelectValue placeholder="Select payment method" />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent>
             <SelectItem value="Checking">Checking</SelectItem>
             <SelectItem value="Zelle">Zelle</SelectItem>
             <SelectItem value="Cash">Cash</SelectItem>
@@ -342,7 +342,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
           <SelectTrigger className="clay-button rounded-2xl border-0">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent>
             <SelectItem value="Pending">Pending</SelectItem>
             <SelectItem value="Paid">Paid</SelectItem>
           </SelectContent>
@@ -376,7 +376,7 @@ export default function ExpenseModal({ expense, onClose, onSave, saving = false 
               <SelectTrigger className="clay-button rounded-2xl border-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="z-[60]">
+              <SelectContent>
                 <SelectItem value="Lab Fees">Lab Fees</SelectItem>
                 <SelectItem value="Equipment">Equipment</SelectItem>
                 <SelectItem value="Travel">Travel</SelectItem>

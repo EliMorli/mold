@@ -421,10 +421,22 @@ export async function getQBExpenses() {
   return data.QueryResponse?.Purchase || [];
 }
 
+// Tag embedded in PrivateNote to identify expenses created from this app
+const APP_EXPENSE_TAG = (id) => `[MoldApp:${id}]`;
+
 export async function createQBExpense(expense) {
   // QuickBooks requires an AccountRef for the bank/payment account.
   // We'll use a generic "Cash on Hand" or "Checking" approach - account ID 1 is usually the primary.
   // In production, this would be configurable per company.
+  // NOTE: DocNumber on Purchase is limited to 21 chars; our UUIDs are 36 chars,
+  // so we embed the app ID in PrivateNote instead for later dedup lookup.
+  const notePieces = [
+    APP_EXPENSE_TAG(expense.id),
+    expense.category,
+    expense.vendor,
+    expense.notes,
+  ].filter(Boolean);
+
   const qbPurchase = {
     PaymentType: 'Cash',
     AccountRef: { value: '1' }, // Primary checking/cash account (varies by company)
@@ -435,10 +447,9 @@ export async function createQBExpense(expense) {
       AccountBasedExpenseLineDetail: {
         AccountRef: { value: '1' }, // Expense account - would be mapped by category in production
       },
-      Description: expense.description || expense.category || 'Expense',
+      Description: (expense.description || expense.category || 'Expense').slice(0, 4000),
     }],
-    PrivateNote: [expense.category, expense.vendor, expense.notes].filter(Boolean).join(' | '),
-    DocNumber: expense.id, // Use app ID as reference
+    PrivateNote: notePieces.join(' | ').slice(0, 4000),
   };
 
   const data = await qbRequest('/purchase', {
@@ -452,20 +463,24 @@ export async function syncExpensesToQB(expenses) {
   const results = { created: 0, skipped: 0, errors: [] };
   const existing = await getQBExpenses();
 
-  // Build map by DocNumber (we use expense.id as DocNumber)
-  const existingByDocNum = new Map();
+  // Build lookup by embedded app-id tag in PrivateNote
+  const existingByAppId = new Map();
   existing.forEach(e => {
-    if (e.DocNumber) existingByDocNum.set(e.DocNumber, e);
+    const note = e.PrivateNote || '';
+    const match = note.match(/\[MoldApp:([^\]]+)\]/);
+    if (match) existingByAppId.set(match[1], e);
   });
 
   for (const exp of expenses) {
     try {
-      if (exp.qb_id || existingByDocNum.has(exp.id)) {
-        // Already synced
-        if (!exp.qb_id && existingByDocNum.has(exp.id)) {
-          const qbExp = existingByDocNum.get(exp.id);
-          await base44.entities.Expense.update(exp.id, { qb_id: qbExp.Id, qb_sync_token: qbExp.SyncToken });
-        }
+      if (exp.qb_id) {
+        results.skipped++;
+        continue;
+      }
+      if (existingByAppId.has(exp.id)) {
+        // Found a matching QB expense - link them
+        const qbExp = existingByAppId.get(exp.id);
+        await base44.entities.Expense.update(exp.id, { qb_id: qbExp.Id, qb_sync_token: qbExp.SyncToken });
         results.skipped++;
         continue;
       }

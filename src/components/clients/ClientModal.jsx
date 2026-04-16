@@ -212,7 +212,7 @@ export default function ClientModal({ client, onClose, onSave, saving = false })
               <SelectTrigger className="clay-button rounded-2xl border-0">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="z-[70]">
+              <SelectContent>
                 <SelectItem value="Direct Client">
                   Direct Client (homeowner, tenant, property manager)
                 </SelectItem>
