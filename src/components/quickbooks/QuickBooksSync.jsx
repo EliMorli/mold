@@ -23,7 +23,10 @@ import {
   TestTube,
   Eye,
   Database,
-  RotateCcw
+  RotateCcw,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Inbox
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -252,6 +255,61 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
       toast.error(e.message || 'Failed to sync invoices');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // ---------- Pull from QuickBooks handlers ----------
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState(null);
+
+  const invalidateAppQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['clients'] }),
+      queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+    ]);
+  };
+
+  const handlePullAll = async () => {
+    setImporting(true);
+    setImportResults(null);
+    try {
+      const results = await QB.performFullImport();
+      setImportResults(results);
+      await invalidateAppQueries();
+      const total = results.customers.imported + results.invoices.imported;
+      const errs = results.customers.errors.length + results.invoices.errors.length;
+      if (errs === 0) toast.success(`Imported ${total} records from QuickBooks`);
+      else toast.message(`Imported ${total} records, ${errs} errors`);
+    } catch (e) {
+      toast.error(e.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handlePullCustomers = async () => {
+    setImporting(true);
+    try {
+      const results = await QB.importCustomersFromQB();
+      await invalidateAppQueries();
+      toast.success(`Imported ${results.imported}, skipped ${results.skipped} customers`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to import customers');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handlePullInvoices = async () => {
+    setImporting(true);
+    try {
+      const results = await QB.importInvoicesFromQB();
+      await invalidateAppQueries();
+      toast.success(`Imported ${results.imported}, skipped ${results.skipped} invoices`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to import invoices');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -670,6 +728,99 @@ export default function QuickBooksSync({ clients = [], invoices = [], isLoading 
                   Creates new records in QuickBooks. Duplicates (by name / invoice #) are skipped.
                 </p>
               </div>
+
+              {/* Pull FROM QuickBooks */}
+              <div className="clay-card rounded-2xl p-5">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <ArrowDownCircle className="w-5 h-5 text-blue-500" />
+                    Pull from QuickBooks
+                  </h3>
+                  <span className="text-xs text-gray-500">
+                    Import customers / invoices created in QuickBooks into this app
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Button
+                    onClick={handlePullAll}
+                    disabled={importing}
+                    className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl py-3 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                  >
+                    {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Inbox className="w-4 h-4" />}
+                    Pull All
+                  </Button>
+                  <Button
+                    onClick={handlePullCustomers}
+                    disabled={importing}
+                    className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-blue-600 disabled:opacity-50"
+                  >
+                    <Users className="w-4 h-4" />
+                    Pull Customers
+                  </Button>
+                  <Button
+                    onClick={handlePullInvoices}
+                    disabled={importing}
+                    className="clay-button rounded-xl py-3 flex items-center justify-center gap-2 text-purple-600 disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Pull Invoices
+                  </Button>
+                </div>
+
+                <p className="text-xs text-gray-400 mt-3">
+                  Fetches all customers/invoices from QuickBooks and creates them in the app. Duplicates (by QB ID or name / invoice #) are skipped.
+                </p>
+              </div>
+
+              {/* Import Results */}
+              {importResults && (
+                <div className="clay-card rounded-2xl p-5">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <ArrowDownCircle className="w-5 h-5 text-blue-500" />
+                      Last Import Results
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Pulled from: <strong>{connectionInfo.companyName}</strong>
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-cyan-50 rounded-xl p-3">
+                      <p className="text-sm text-cyan-600 font-medium">Customers</p>
+                      <p className="text-xl font-bold text-cyan-700">{importResults.customers.imported} imported</p>
+                      <p className="text-xs text-cyan-500">
+                        {importResults.customers.skipped} skipped
+                        {importResults.customers.errors.length > 0 && `, ${importResults.customers.errors.length} errors`}
+                      </p>
+                    </div>
+                    <div className="bg-indigo-50 rounded-xl p-3">
+                      <p className="text-sm text-indigo-600 font-medium">Invoices</p>
+                      <p className="text-xl font-bold text-indigo-700">{importResults.invoices.imported} imported</p>
+                      <p className="text-xs text-indigo-500">
+                        {importResults.invoices.skipped} skipped
+                        {importResults.invoices.errors.length > 0 && `, ${importResults.invoices.errors.length} errors`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {(importResults.customers.errors.length > 0 || importResults.invoices.errors.length > 0) && (
+                    <details className="mt-3">
+                      <summary className="text-xs text-red-600 cursor-pointer font-medium">
+                        View error details ({importResults.customers.errors.length + importResults.invoices.errors.length})
+                      </summary>
+                      <div className="mt-2 bg-red-50 rounded-xl p-3 text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                        {importResults.customers.errors.map((err, i) => (
+                          <div key={`c-${i}`}><strong>Customer "{err.name}":</strong> {err.error}</div>
+                        ))}
+                        {importResults.invoices.errors.map((err, i) => (
+                          <div key={`i-${i}`}><strong>Invoice #{err.number}:</strong> {err.error}</div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
 
               {syncResults && (
                 <div className="clay-card rounded-2xl p-5">

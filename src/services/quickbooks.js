@@ -4,6 +4,8 @@
 // Token exchange happens through our backend (/api/quickbooks/token) so the
 // CLIENT_SECRET is never exposed to the browser.
 
+import { base44 } from '@/api/base44Client';
+
 const QB_CONFIG = {
   clientId: import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || '',
   redirectUri: import.meta.env.VITE_QUICKBOOKS_REDIRECT_URI || `${window.location.origin}/Settings?tab=quickbooks`,
@@ -359,4 +361,183 @@ export async function performFullSync(customers, invoices) {
     customers: await syncCustomersToQB(customers),
     invoices: await syncInvoicesToQB(invoices),
   };
+}
+
+// ============ Import FROM QuickBooks (pull direction) ============
+// These fetch records from QuickBooks and save them into the app's local data store.
+
+/**
+ * Convert a QuickBooks Customer object to our app's client format.
+ */
+function qbCustomerToAppClient(qbCustomer) {
+  // Build address string from BillAddr components
+  let address = '';
+  if (qbCustomer.BillAddr) {
+    const parts = [
+      qbCustomer.BillAddr.Line1,
+      qbCustomer.BillAddr.Line2,
+      qbCustomer.BillAddr.City,
+      [qbCustomer.BillAddr.CountrySubDivisionCode, qbCustomer.BillAddr.PostalCode].filter(Boolean).join(' '),
+    ].filter(Boolean);
+    address = parts.join(', ');
+  }
+
+  return {
+    name: qbCustomer.DisplayName || qbCustomer.CompanyName || 'Unknown',
+    email: qbCustomer.PrimaryEmailAddr?.Address || '',
+    phone: qbCustomer.PrimaryPhone?.FreeFormNumber || qbCustomer.Mobile?.FreeFormNumber || '',
+    address,
+    client_type: qbCustomer.CompanyName ? 'Business' : 'Homeowner',
+    qb_id: qbCustomer.Id,
+    qb_sync_token: qbCustomer.SyncToken,
+    notes: qbCustomer.Notes || '',
+  };
+}
+
+/**
+ * Convert a QuickBooks Invoice object to our app's invoice format.
+ */
+function qbInvoiceToAppInvoice(qbInvoice, clientIdByName = {}) {
+  const balance = parseFloat(qbInvoice.Balance) || 0;
+  const total = parseFloat(qbInvoice.TotalAmt) || 0;
+  const customerName = qbInvoice.CustomerRef?.name || '';
+
+  // Determine status based on balance and total
+  let status = 'Sent';
+  if (balance === 0 && total > 0) status = 'Paid';
+  else if (balance > 0 && balance < total) status = 'Partially Paid';
+
+  // Check if overdue
+  const dueDate = qbInvoice.DueDate ? new Date(qbInvoice.DueDate) : null;
+  if (status === 'Sent' && dueDate && dueDate < new Date()) {
+    status = 'Overdue';
+  }
+
+  return {
+    invoice_number: qbInvoice.DocNumber || `QB-${qbInvoice.Id}`,
+    client_id: clientIdByName[customerName?.toLowerCase()] || '',
+    client_name: customerName,
+    total,
+    amount_paid: total - balance,
+    status,
+    issue_date: qbInvoice.TxnDate ? new Date(qbInvoice.TxnDate).toISOString() : null,
+    due_date: qbInvoice.DueDate ? new Date(qbInvoice.DueDate).toISOString() : null,
+    paid_date: balance === 0 && qbInvoice.MetaData?.LastUpdatedTime
+      ? new Date(qbInvoice.MetaData.LastUpdatedTime).toISOString()
+      : null,
+    qb_id: qbInvoice.Id,
+    qb_sync_token: qbInvoice.SyncToken,
+    notes: qbInvoice.PrivateNote || qbInvoice.CustomerMemo?.value || '',
+  };
+}
+
+/**
+ * Import customers FROM QuickBooks into the app.
+ * Skips duplicates (matches on qb_id first, then name).
+ */
+export async function importCustomersFromQB() {
+  const results = { imported: 0, skipped: 0, errors: [] };
+
+  // Fetch existing app clients to detect duplicates
+  const existingClients = await base44.entities.Client.list();
+  const existingByQbId = new Map();
+  const existingByName = new Map();
+  existingClients.forEach(c => {
+    if (c.qb_id) existingByQbId.set(c.qb_id, c);
+    if (c.name) existingByName.set(c.name.toLowerCase(), c);
+  });
+
+  // Pull customers from QuickBooks
+  const qbCustomers = await getQBCustomers();
+
+  for (const qbCust of qbCustomers) {
+    try {
+      // Skip if we already have this QB customer (by QB ID)
+      if (existingByQbId.has(qbCust.Id)) {
+        results.skipped++;
+        continue;
+      }
+      // Skip if we have a record with the same name (avoid duplicates on re-sync)
+      const displayName = (qbCust.DisplayName || qbCust.CompanyName || '').toLowerCase();
+      if (displayName && existingByName.has(displayName)) {
+        // Link existing record to QB ID so future syncs know
+        const existing = existingByName.get(displayName);
+        await base44.entities.Client.update(existing.id, { qb_id: qbCust.Id, qb_sync_token: qbCust.SyncToken });
+        results.skipped++;
+        continue;
+      }
+
+      const appClient = qbCustomerToAppClient(qbCust);
+      await base44.entities.Client.create(appClient);
+      results.imported++;
+    } catch (e) {
+      results.errors.push({ name: qbCust.DisplayName, error: e.message });
+    }
+  }
+  return results;
+}
+
+/**
+ * Import invoices FROM QuickBooks into the app.
+ * Skips duplicates (matches on qb_id first, then invoice_number).
+ */
+export async function importInvoicesFromQB() {
+  const results = { imported: 0, skipped: 0, errors: [] };
+
+  // Fetch existing app invoices and clients to link them up
+  const [existingInvoices, existingClients] = await Promise.all([
+    base44.entities.Invoice.list(),
+    base44.entities.Client.list(),
+  ]);
+
+  const existingByQbId = new Map();
+  const existingByNumber = new Map();
+  existingInvoices.forEach(inv => {
+    if (inv.qb_id) existingByQbId.set(inv.qb_id, inv);
+    if (inv.invoice_number) existingByNumber.set(inv.invoice_number, inv);
+  });
+
+  // Build a client name → id map for linking invoices to app clients
+  const clientIdByName = {};
+  existingClients.forEach(c => {
+    if (c.name) clientIdByName[c.name.toLowerCase()] = c.id;
+  });
+
+  // Pull invoices from QuickBooks
+  const qbInvoices = await getQBInvoices();
+
+  for (const qbInv of qbInvoices) {
+    try {
+      // Skip if we already imported this QB invoice
+      if (existingByQbId.has(qbInv.Id)) {
+        results.skipped++;
+        continue;
+      }
+      // Skip if we have an invoice with the same number
+      if (qbInv.DocNumber && existingByNumber.has(qbInv.DocNumber)) {
+        // Link existing record to QB ID
+        const existing = existingByNumber.get(qbInv.DocNumber);
+        await base44.entities.Invoice.update(existing.id, { qb_id: qbInv.Id, qb_sync_token: qbInv.SyncToken });
+        results.skipped++;
+        continue;
+      }
+
+      const appInvoice = qbInvoiceToAppInvoice(qbInv, clientIdByName);
+      await base44.entities.Invoice.create(appInvoice);
+      results.imported++;
+    } catch (e) {
+      results.errors.push({ number: qbInv.DocNumber, error: e.message });
+    }
+  }
+  return results;
+}
+
+/**
+ * Pull both customers and invoices from QuickBooks into the app.
+ */
+export async function performFullImport() {
+  // Import customers first so invoices can link to them
+  const customers = await importCustomersFromQB();
+  const invoices = await importInvoicesFromQB();
+  return { customers, invoices };
 }
