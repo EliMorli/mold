@@ -16,7 +16,11 @@ import {
   Building2,
   ArrowRight,
   AlertTriangle,
-  Shield
+  Shield,
+  Copy,
+  Hash,
+  TestTube,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +77,8 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
   const [connectionInfo, setConnectionInfo] = useState(QB.getConnectionInfo());
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [syncResults, setSyncResults] = useState(null);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
 
@@ -118,14 +124,38 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
       await QB.disconnect();
       setConnectionInfo({ isConnected: false });
       setSyncResults(null);
+      setTestResult(null);
       toast.success('Disconnected from QuickBooks. Next connect will prompt for company selection.');
     } catch (e) {
       // Fallback: clear local tokens even if revoke fails
       QB.clearTokens();
       setConnectionInfo({ isConnected: false });
       setSyncResults(null);
+      setTestResult(null);
       toast.success('Disconnected locally');
     }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const info = await QB.testConnection();
+      setTestResult({ success: true, info });
+      // Refresh connection info to show updated company name
+      setConnectionInfo(QB.getConnectionInfo());
+      toast.success(`Connected to: ${info.CompanyName}`);
+    } catch (e) {
+      setTestResult({ success: false, error: e.message });
+      toast.error(`Test failed: ${e.message}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const copyToClipboard = (text, label = 'Copied') => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
   };
 
   const handleSyncAll = async () => {
@@ -364,6 +394,129 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
         <div className="space-y-4">
           {connectionInfo.isConnected ? (
             <>
+              {/* Connection Details Panel */}
+              <div className="rounded-2xl p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Connected To</p>
+                      <p className="text-lg font-bold text-gray-800">
+                        {connectionInfo.companyName || 'Loading...'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleTestConnection}
+                      disabled={testing}
+                      className="clay-button rounded-xl px-3 py-2 text-sm flex items-center gap-1.5 text-blue-600"
+                    >
+                      {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
+                      Test Connection
+                    </Button>
+                    <a
+                      href={connectionInfo.environment === 'production'
+                        ? 'https://qbo.intuit.com/app/homepage'
+                        : 'https://app.sandbox.qbo.intuit.com/app/homepage'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="clay-button rounded-xl px-3 py-2 text-sm flex items-center gap-1.5 text-purple-600 hover:scale-[1.02] transition-transform"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Open in QuickBooks
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Details grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="bg-white/70 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-1">
+                      <Hash className="w-3 h-3" />
+                      Realm ID (Company ID)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs font-mono text-gray-800 break-all">{connectionInfo.realmId}</code>
+                      <button
+                        onClick={() => copyToClipboard(connectionInfo.realmId, 'Realm ID')}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                        title="Copy"
+                      >
+                        <Copy className="w-3 h-3 text-gray-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/70 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-1">
+                      <Shield className="w-3 h-3" />
+                      Environment
+                    </div>
+                    <Badge className={`${
+                      connectionInfo.environment === 'production'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-blue-100 text-blue-700'
+                    } rounded-lg px-2 py-0.5 text-xs uppercase font-bold`}>
+                      {connectionInfo.environment || 'sandbox'}
+                    </Badge>
+                  </div>
+
+                  <div className="bg-white/70 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 text-gray-500 text-xs mb-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Status
+                    </div>
+                    <p className="text-sm font-semibold text-green-700">
+                      Active connection
+                    </p>
+                  </div>
+                </div>
+
+                {/* Test Result */}
+                {testResult && (
+                  <div className={`mt-3 rounded-xl p-3 ${
+                    testResult.success ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'
+                  }`}>
+                    {testResult.success ? (
+                      <div className="text-sm">
+                        <p className="font-semibold text-green-800 flex items-center gap-1.5">
+                          <CheckCircle className="w-4 h-4" />
+                          Connection verified
+                        </p>
+                        <div className="mt-1 text-green-700 text-xs space-y-0.5">
+                          <p><strong>Company:</strong> {testResult.info.CompanyName}</p>
+                          {testResult.info.LegalName && <p><strong>Legal Name:</strong> {testResult.info.LegalName}</p>}
+                          {testResult.info.Country && <p><strong>Country:</strong> {testResult.info.Country}</p>}
+                          {testResult.info.FiscalYearStartMonth && <p><strong>Fiscal Year Start:</strong> {testResult.info.FiscalYearStartMonth}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-red-800 flex items-center gap-1.5">
+                        <XCircle className="w-4 h-4" />
+                        Test failed: {testResult.error}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Sandbox notice */}
+                {connectionInfo.environment !== 'production' && (
+                  <div className="mt-3 text-xs text-blue-700 bg-blue-50 rounded-xl p-3 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Sandbox mode:</strong> Synced data goes to your sandbox company.
+                      To view it, click <strong>"Open in QuickBooks"</strong> above and look for customers/invoices in the sandbox company.
+                      You may need to log in to <a href="https://developer.intuit.com/app/developer/dashboard" target="_blank" rel="noopener noreferrer" className="underline">developer.intuit.com</a> first.
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="clay-card rounded-2xl p-5">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <RefreshCw className="w-5 h-5 text-green-500" />
@@ -404,7 +557,12 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
 
               {syncResults && (
                 <div className="clay-card rounded-2xl p-5">
-                  <h3 className="font-bold text-gray-800 mb-3">Last Sync Results</h3>
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                    <h3 className="font-bold text-gray-800">Last Sync Results</h3>
+                    <p className="text-xs text-gray-500">
+                      Synced to: <strong>{connectionInfo.companyName}</strong>
+                    </p>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-blue-50 rounded-xl p-3">
                       <p className="text-sm text-blue-600 font-medium">Customers</p>
@@ -413,6 +571,19 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
                         {syncResults.customers.skipped} skipped
                         {syncResults.customers.errors.length > 0 && `, ${syncResults.customers.errors.length} errors`}
                       </p>
+                      {syncResults.customers.created > 0 && (
+                        <a
+                          href={connectionInfo.environment === 'production'
+                            ? 'https://qbo.intuit.com/app/customers'
+                            : 'https://app.sandbox.qbo.intuit.com/app/customers'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          View in QuickBooks
+                        </a>
+                      )}
                     </div>
                     <div className="bg-purple-50 rounded-xl p-3">
                       <p className="text-sm text-purple-600 font-medium">Invoices</p>
@@ -421,8 +592,42 @@ export default function QuickBooksSync({ clients = [], invoices = [] }) {
                         {syncResults.invoices.skipped} skipped
                         {syncResults.invoices.errors.length > 0 && `, ${syncResults.invoices.errors.length} errors`}
                       </p>
+                      {syncResults.invoices.created > 0 && (
+                        <a
+                          href={connectionInfo.environment === 'production'
+                            ? 'https://qbo.intuit.com/app/invoices'
+                            : 'https://app.sandbox.qbo.intuit.com/app/invoices'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-600 hover:underline mt-2 inline-flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          View in QuickBooks
+                        </a>
+                      )}
                     </div>
                   </div>
+
+                  {/* Show error details if any */}
+                  {(syncResults.customers.errors.length > 0 || syncResults.invoices.errors.length > 0) && (
+                    <details className="mt-3">
+                      <summary className="text-xs text-red-600 cursor-pointer font-medium">
+                        View error details ({syncResults.customers.errors.length + syncResults.invoices.errors.length})
+                      </summary>
+                      <div className="mt-2 bg-red-50 rounded-xl p-3 text-xs text-red-700 space-y-1 max-h-40 overflow-y-auto">
+                        {syncResults.customers.errors.map((err, i) => (
+                          <div key={`c-${i}`}>
+                            <strong>Customer "{err.name}":</strong> {err.error}
+                          </div>
+                        ))}
+                        {syncResults.invoices.errors.map((err, i) => (
+                          <div key={`i-${i}`}>
+                            <strong>Invoice #{err.number}:</strong> {err.error}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
             </>
