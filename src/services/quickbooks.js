@@ -158,7 +158,37 @@ export function getConnectionInfo() {
     isConnected: isConnected(),
     companyName: localStorage.getItem(STORAGE_KEYS.companyName),
     realmId: localStorage.getItem(STORAGE_KEYS.realmId),
+    environment: QB_CONFIG.environment,
   };
+}
+
+/**
+ * Returns the URL to open the connected QuickBooks company
+ */
+export function getQuickBooksAppUrl(path = '') {
+  const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
+  if (!realmId) return null;
+
+  const base = QB_CONFIG.environment === 'production'
+    ? 'https://qbo.intuit.com'
+    : 'https://app.sandbox.qbo.intuit.com';
+
+  return `${base}/app/${path}`;
+}
+
+/**
+ * Tests the connection by fetching company info from QuickBooks.
+ * Returns the company info object on success, throws on failure.
+ */
+export async function testConnection() {
+  const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
+  if (!realmId) throw new Error('Not connected');
+  const data = await qbRequest(`/companyinfo/${realmId}`);
+  // Update stored company name in case it changed
+  if (data.CompanyInfo?.CompanyName) {
+    localStorage.setItem(STORAGE_KEYS.companyName, data.CompanyInfo.CompanyName);
+  }
+  return data.CompanyInfo;
 }
 
 // ============ API calls (routed through /api/quickbooks/proxy to avoid CORS) ============
