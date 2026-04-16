@@ -349,8 +349,58 @@ async function findOrCreateCustomer(name, email) {
   return await createQBCustomer({ name, email });
 }
 
+// Cache for service items
+let cachedItems = null;
+let itemsCacheTime = 0;
+const ITEMS_CACHE_TTL = 5 * 60 * 1000;
+
+async function findOrCreateServiceItem() {
+  // Reuse cached result if fresh
+  if (cachedItems && Date.now() - itemsCacheTime < ITEMS_CACHE_TTL) {
+    return cachedItems;
+  }
+
+  // First try to find an existing Service item
+  const data = await qbRequest('/query?query=' + encodeURIComponent(
+    "SELECT * FROM Item WHERE Type = 'Service' MAXRESULTS 10"
+  ));
+  const items = data.QueryResponse?.Item || [];
+  const activeItem = items.find(i => i.Active !== false);
+  if (activeItem) {
+    cachedItems = { value: activeItem.Id, name: activeItem.Name };
+    itemsCacheTime = Date.now();
+    return cachedItems;
+  }
+
+  // No service items exist - create one
+  // First find an income account to link the item to
+  const accounts = await getQBAccounts();
+  const incomeAccount = accounts.find(a =>
+    (a.AccountType === 'Income' || a.AccountType === 'Other Income') && a.Active !== false
+  );
+  if (!incomeAccount) {
+    throw new Error('No Income account found in QuickBooks. Please create one before syncing invoices.');
+  }
+
+  const newItem = {
+    Name: 'Mold Testing Services',
+    Type: 'Service',
+    IncomeAccountRef: { value: incomeAccount.Id, name: incomeAccount.Name },
+  };
+
+  const createData = await qbRequest('/item', {
+    method: 'POST',
+    body: JSON.stringify(newItem),
+  });
+  const created = createData.Item;
+  cachedItems = { value: created.Id, name: created.Name };
+  itemsCacheTime = Date.now();
+  return cachedItems;
+}
+
 export async function createQBInvoice(invoice) {
   const customer = await findOrCreateCustomer(invoice.client_name, invoice.client_email);
+  const serviceItem = await findOrCreateServiceItem();
 
   const qbInvoice = {
     CustomerRef: { value: customer.Id },
@@ -361,7 +411,7 @@ export async function createQBInvoice(invoice) {
       Amount: parseFloat(invoice.total) || 0,
       DetailType: 'SalesItemLineDetail',
       SalesItemLineDetail: {
-        ItemRef: { value: '1', name: 'Services' },
+        ItemRef: serviceItem,
         Qty: 1,
         UnitPrice: parseFloat(invoice.total) || 0,
       },
