@@ -275,15 +275,33 @@ export async function createQBCustomer(customer) {
 export async function syncCustomersToQB(customers) {
   const results = { created: 0, skipped: 0, errors: [] };
   const existing = await getQBCustomers();
-  const existingNames = new Set(existing.map(c => c.DisplayName?.toLowerCase()));
+
+  // Build map of existing QB customers by display name (case-insensitive)
+  const existingByName = new Map();
+  existing.forEach(c => {
+    if (c.DisplayName) existingByName.set(c.DisplayName.toLowerCase(), c);
+  });
 
   for (const c of customers) {
     try {
-      if (existingNames.has(c.name?.toLowerCase())) {
+      const nameLower = c.name?.toLowerCase();
+      if (nameLower && existingByName.has(nameLower)) {
+        // Customer already exists in QB - link app client to QB ID if not already linked
+        if (!c.qb_id && c.id) {
+          const qbCust = existingByName.get(nameLower);
+          await base44.entities.Client.update(c.id, { qb_id: qbCust.Id, qb_sync_token: qbCust.SyncToken });
+        }
         results.skipped++;
         continue;
       }
-      await createQBCustomer(c);
+      // Create in QuickBooks and store the returned QB ID back to app client
+      const createdQBCustomer = await createQBCustomer(c);
+      if (createdQBCustomer && c.id) {
+        await base44.entities.Client.update(c.id, {
+          qb_id: createdQBCustomer.Id,
+          qb_sync_token: createdQBCustomer.SyncToken
+        });
+      }
       results.created++;
     } catch (e) {
       results.errors.push({ name: c.name, error: e.message });
@@ -339,15 +357,32 @@ export async function createQBInvoice(invoice) {
 export async function syncInvoicesToQB(invoices) {
   const results = { created: 0, skipped: 0, errors: [] };
   const existing = await getQBInvoices();
-  const existingNums = new Set(existing.map(i => i.DocNumber));
+
+  // Build map of existing QB invoices by DocNumber
+  const existingByNum = new Map();
+  existing.forEach(i => {
+    if (i.DocNumber) existingByNum.set(i.DocNumber, i);
+  });
 
   for (const inv of invoices) {
     try {
-      if (existingNums.has(inv.invoice_number)) {
+      if (inv.invoice_number && existingByNum.has(inv.invoice_number)) {
+        // Invoice already exists in QB - link app invoice to QB ID if not already linked
+        if (!inv.qb_id && inv.id) {
+          const qbInv = existingByNum.get(inv.invoice_number);
+          await base44.entities.Invoice.update(inv.id, { qb_id: qbInv.Id, qb_sync_token: qbInv.SyncToken });
+        }
         results.skipped++;
         continue;
       }
-      await createQBInvoice(inv);
+      // Create in QuickBooks and store the returned QB ID back to app invoice
+      const createdQBInvoice = await createQBInvoice(inv);
+      if (createdQBInvoice && inv.id) {
+        await base44.entities.Invoice.update(inv.id, {
+          qb_id: createdQBInvoice.Id,
+          qb_sync_token: createdQBInvoice.SyncToken
+        });
+      }
       results.created++;
     } catch (e) {
       results.errors.push({ number: inv.invoice_number, error: e.message });
@@ -397,10 +432,11 @@ function qbCustomerToAppClient(qbCustomer) {
 /**
  * Convert a QuickBooks Invoice object to our app's invoice format.
  */
-function qbInvoiceToAppInvoice(qbInvoice, clientIdByName = {}) {
+function qbInvoiceToAppInvoice(qbInvoice, clientLookup = {}) {
   const balance = parseFloat(qbInvoice.Balance) || 0;
   const total = parseFloat(qbInvoice.TotalAmt) || 0;
   const customerName = qbInvoice.CustomerRef?.name || '';
+  const customerQbId = qbInvoice.CustomerRef?.value || '';
 
   // Determine status based on balance and total
   let status = 'Sent';
@@ -413,10 +449,24 @@ function qbInvoiceToAppInvoice(qbInvoice, clientIdByName = {}) {
     status = 'Overdue';
   }
 
+  // Look up client: first by QB customer ID (reliable), then fall back to name match
+  let client_id = '';
+  let client_name = customerName;
+
+  if (customerQbId && clientLookup.byQbId[customerQbId]) {
+    const client = clientLookup.byQbId[customerQbId];
+    client_id = client.id;
+    client_name = client.name || customerName;
+  } else if (customerName && clientLookup.byName[customerName.toLowerCase()]) {
+    const client = clientLookup.byName[customerName.toLowerCase()];
+    client_id = client.id;
+    client_name = client.name || customerName;
+  }
+
   return {
     invoice_number: qbInvoice.DocNumber || `QB-${qbInvoice.Id}`,
-    client_id: clientIdByName[customerName?.toLowerCase()] || '',
-    client_name: customerName,
+    client_id,
+    client_name,
     total,
     amount_paid: total - balance,
     status,
@@ -497,10 +547,13 @@ export async function importInvoicesFromQB() {
     if (inv.invoice_number) existingByNumber.set(inv.invoice_number, inv);
   });
 
-  // Build a client name → id map for linking invoices to app clients
-  const clientIdByName = {};
+  // Build client lookup maps for linking invoices to app clients
+  // Primary: by qb_id (QB customer ID → app client) - reliable link
+  // Fallback: by name (case-insensitive)
+  const clientLookup = { byQbId: {}, byName: {} };
   existingClients.forEach(c => {
-    if (c.name) clientIdByName[c.name.toLowerCase()] = c.id;
+    if (c.qb_id) clientLookup.byQbId[c.qb_id] = c;
+    if (c.name) clientLookup.byName[c.name.toLowerCase()] = c;
   });
 
   // Pull invoices from QuickBooks
@@ -522,7 +575,7 @@ export async function importInvoicesFromQB() {
         continue;
       }
 
-      const appInvoice = qbInvoiceToAppInvoice(qbInv, clientIdByName);
+      const appInvoice = qbInvoiceToAppInvoice(qbInv, clientLookup);
       await base44.entities.Invoice.create(appInvoice);
       results.imported++;
     } catch (e) {
