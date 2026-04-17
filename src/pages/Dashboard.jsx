@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import {
   FlaskConical,
@@ -24,12 +25,16 @@ import {
   BarChart3,
   List,
   LayoutDashboard,
-  Check
+  Check,
+  Plus
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import DayCalendarGrid from "@/components/dashboard/calendar/DayCalendarGrid";
+import TestModal from "@/components/tests/TestModal";
+import InvoiceModal from "@/components/invoices/InvoiceModal";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("kpis");
@@ -67,6 +72,108 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Technician.list(),
     initialData: [],
   });
+
+  const { data: labs = [] } = useQuery({
+    queryKey: ['labs'],
+    queryFn: () => base44.entities.Lab.list(),
+    initialData: [],
+  });
+
+  const queryClient = useQueryClient();
+
+  // Modal state for Daily Jobs calendar view
+  const [jobModal, setJobModal] = useState({ open: false, mode: null, test: null, prefill: null });
+  const [invoiceModal, setInvoiceModal] = useState({ open: false, prefill: null });
+
+  const createTestMutation = useMutation({
+    mutationFn: (data) => base44.entities.Test.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tests']);
+      setJobModal({ open: false, mode: null, test: null, prefill: null });
+      toast.success('Job created');
+    },
+    onError: (e) => toast.error('Failed to create job', { description: e.message }),
+  });
+
+  const updateTestMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Test.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tests']);
+      setJobModal({ open: false, mode: null, test: null, prefill: null });
+      toast.success('Job updated');
+    },
+    onError: (e) => toast.error('Failed to update job', { description: e.message }),
+  });
+
+  const deleteTestMutation = useMutation({
+    mutationFn: (id) => base44.entities.Test.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tests']);
+      toast.success('Job deleted');
+    },
+    onError: (e) => toast.error('Failed to delete job', { description: e.message }),
+  });
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: (data) => base44.entities.Invoice.create(data),
+    onSuccess: (inv) => {
+      queryClient.invalidateQueries(['invoices']);
+      setInvoiceModal({ open: false, prefill: null });
+      toast.success(`Invoice created: ${inv?.invoice_number || ''}`);
+    },
+    onError: (e) => toast.error('Failed to create invoice', { description: e.message }),
+  });
+
+  const completeTestMutation = useMutation({
+    mutationFn: ({ id }) => base44.entities.Test.update(id, { status: 'Completed', completed_date: new Date().toISOString() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tests']);
+      toast.success('Job marked complete');
+    },
+    onError: (e) => toast.error('Failed to update job', { description: e.message }),
+  });
+
+  const handleSlotClick = (slotStart, technician) => {
+    setJobModal({
+      open: true,
+      mode: 'create',
+      test: null,
+      prefill: {
+        scheduled_date: slotStart.toISOString(),
+        technician_id: technician?.id || '',
+        technician_name: technician?.name || '',
+        duration_minutes: 120,
+      },
+    });
+  };
+
+  const handleEditJob = (test) => {
+    setJobModal({ open: true, mode: 'edit', test, prefill: null });
+  };
+
+  const handleCreateInvoice = (test) => {
+    setInvoiceModal({
+      open: true,
+      prefill: {
+        test_id: test.id,
+        test_number: test.test_number,
+        client_id: test.client_id || '',
+        client_name: test.client_name || '',
+        amount: test.cost || 0,
+        total: test.cost || 0,
+      },
+    });
+  };
+
+  const handleMarkComplete = (test) => {
+    completeTestMutation.mutate({ id: test.id });
+  };
+
+  const handleDeleteJob = (test) => {
+    if (window.confirm(`Delete job ${test.test_number}? This cannot be undone.`)) {
+      deleteTestMutation.mutate(test.id);
+    }
+  };
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -1019,69 +1126,17 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Jobs Table */}
-          <div className="clay-card rounded-3xl p-6 overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Time</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Job #</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Client</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Address</th>
-                  <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Tech</th>
-                  <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">In</th>
-                  <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Out</th>
-                  <th className="text-right py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Pay</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailyJobs.map((job) => (
-                  <tr
-                    key={job.id}
-                    onClick={() => window.location.href = `${createPageUrl('TestProfile')}?id=${job.id}`}
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <td className="py-3 px-2 text-sm font-medium text-gray-700">{formatTime(job.scheduled_date)}</td>
-                    <td className="py-3 px-2 text-sm font-bold text-purple-600">{job.test_number}</td>
-                    <td className="py-3 px-2 text-sm text-gray-700">{job.client_name}</td>
-                    <td className="py-3 px-2 text-sm text-gray-600 truncate max-w-[200px]">{job.property_address}</td>
-                    <td className="py-3 px-2 text-sm text-gray-700">{job.technician_name || '-'}</td>
-                    <td className="py-3 px-2 text-center">
-                      <Badge className={`${statusColors[job.status]} border rounded-lg px-2 py-0.5 text-xs`}>
-                        {job.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      {job.in_reports ? (
-                        <Check className="w-5 h-5 text-green-500 mx-auto" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-300 mx-auto" />
-                      )}
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      {job.out_reports ? (
-                        <Check className="w-5 h-5 text-green-500 mx-auto" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-300 mx-auto" />
-                      )}
-                    </td>
-                    <td className="py-3 px-2 text-right text-sm font-bold text-emerald-600">
-                      ${((job.technician_pay || 0) + (job.pay_adjustment_amount || 0)).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {dailyJobs.length === 0 && (
-              <div className="text-center py-12">
-                <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-700 mb-2">No jobs scheduled</h3>
-                <p className="text-gray-500">No jobs for {formatDate(selectedDate)}</p>
-              </div>
-            )}
-          </div>
+          {/* Google Calendar-style day view */}
+          <DayCalendarGrid
+            date={selectedDate}
+            tests={dailyJobs}
+            technicians={technicians}
+            onSlotClick={handleSlotClick}
+            onEditJob={handleEditJob}
+            onCreateInvoice={handleCreateInvoice}
+            onMarkComplete={handleMarkComplete}
+            onDeleteJob={handleDeleteJob}
+          />
         </>
       )}
 
@@ -1148,6 +1203,37 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Test Modal (create/edit from Daily Jobs calendar) */}
+      {jobModal.open && (
+        <TestModal
+          test={jobModal.mode === 'edit' ? jobModal.test : jobModal.prefill}
+          clients={clients}
+          technicians={technicians.filter(t => t.can_be_assigned_jobs !== false)}
+          labs={labs}
+          onClose={() => setJobModal({ open: false, mode: null, test: null, prefill: null })}
+          onSave={(data) => {
+            if (jobModal.mode === 'edit') {
+              updateTestMutation.mutate({ id: jobModal.test.id, data });
+            } else {
+              createTestMutation.mutate(data);
+            }
+          }}
+          saving={createTestMutation.isPending || updateTestMutation.isPending}
+        />
+      )}
+
+      {/* Invoice Modal (create from job) */}
+      {invoiceModal.open && (
+        <InvoiceModal
+          invoice={invoiceModal.prefill}
+          clients={clients}
+          tests={tests}
+          onClose={() => setInvoiceModal({ open: false, prefill: null })}
+          onSave={(data) => createInvoiceMutation.mutate(data)}
+          saving={createInvoiceMutation.isPending}
+        />
       )}
     </div>
   );
