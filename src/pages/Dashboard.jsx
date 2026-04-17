@@ -34,6 +34,7 @@ import { createPageUrl } from "@/utils";
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import DayCalendarGrid from "@/components/dashboard/calendar/DayCalendarGrid";
 import CalendarSection from "@/components/dashboard/calendar/CalendarSection";
+import JobsReportTable from "@/components/dashboard/JobsReportTable";
 import TestModal from "@/components/tests/TestModal";
 import InvoiceModal from "@/components/invoices/InvoiceModal";
 
@@ -1043,67 +1044,48 @@ export default function Dashboard() {
 
       {/* ============ REPORTS TAB ============ */}
       {activeTab === 'reports' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div
-            onClick={() => handleExportReport('jobs')}
-            className="clay-card clay-card-hover rounded-3xl p-8 cursor-pointer text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center mx-auto mb-4">
-              <FlaskConical className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Jobs Report</h3>
-            <p className="text-sm text-gray-500">Export all jobs with status, technician, and tracking info</p>
-            <Button className="clay-button rounded-2xl px-6 py-2 mt-4 font-semibold text-purple-600">
+        <>
+          {/* CSV Export Row */}
+          <div className="clay-card rounded-3xl p-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-gray-700 mr-2">Export:</span>
+            <Button
+              onClick={() => handleExportReport('jobs')}
+              className="clay-button rounded-xl px-4 py-2 text-sm font-medium text-purple-600 hover:scale-105"
+            >
               <Download className="w-4 h-4 mr-2" />
-              Export CSV
+              Jobs CSV
+            </Button>
+            <Button
+              onClick={() => handleExportReport('invoices')}
+              className="clay-button rounded-xl px-4 py-2 text-sm font-medium text-green-600 hover:scale-105"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Invoices CSV
+            </Button>
+            <Button
+              onClick={() => handleExportReport('expenses')}
+              className="clay-button rounded-xl px-4 py-2 text-sm font-medium text-red-600 hover:scale-105"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Expenses CSV
+            </Button>
+            <Button
+              onClick={() => handleExportReport('financials')}
+              className="clay-button rounded-xl px-4 py-2 text-sm font-medium text-blue-600 hover:scale-105"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Financial Summary CSV
             </Button>
           </div>
 
-          <div
-            onClick={() => handleExportReport('invoices')}
-            className="clay-card clay-card-hover rounded-3xl p-8 cursor-pointer text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center mx-auto mb-4">
-              <Receipt className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Invoices Report</h3>
-            <p className="text-sm text-gray-500">Export all invoices with amounts and payment status</p>
-            <Button className="clay-button rounded-2xl px-6 py-2 mt-4 font-semibold text-green-600">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-
-          <div
-            onClick={() => handleExportReport('expenses')}
-            className="clay-card clay-card-hover rounded-3xl p-8 cursor-pointer text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-400 to-pink-400 flex items-center justify-center mx-auto mb-4">
-              <Wallet className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Expenses Report</h3>
-            <p className="text-sm text-gray-500">Export all expenses by category and vendor</p>
-            <Button className="clay-button rounded-2xl px-6 py-2 mt-4 font-semibold text-red-600">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-
-          <div
-            onClick={() => handleExportReport('financials')}
-            className="clay-card clay-card-hover rounded-3xl p-8 cursor-pointer text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center mx-auto mb-4">
-              <BarChart3 className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Financial Summary</h3>
-            <p className="text-sm text-gray-500">Export revenue, expenses, profit, and collections</p>
-            <Button className="clay-button rounded-2xl px-6 py-2 mt-4 font-semibold text-blue-600">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-        </div>
+          {/* Spreadsheet-style Jobs Report */}
+          <JobsReportTable
+            tests={tests}
+            invoices={invoices}
+            clients={clients}
+            onUpdateTest={(id, data) => updateTestMutation.mutate({ id, data })}
+          />
+        </>
       )}
 
       {/* Test Modal (create/edit from Daily Jobs calendar) */}
