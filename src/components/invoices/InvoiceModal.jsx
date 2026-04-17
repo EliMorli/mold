@@ -36,10 +36,10 @@ export default function InvoiceModal({ invoice, clients, tests, onClose, onSave,
   });
   const [errors, setErrors] = useState({});
 
-  // Auto-generate invoice number for new invoices
+  // Auto-generate invoice number for new invoices (prefill objects without id are "new")
   useEffect(() => {
     const generateInvoiceNumber = async () => {
-      if (invoice) return; // Don't generate for existing invoices
+      if (invoice?.id) return; // Don't generate for existing invoices
 
       try {
         // Get all invoices to find the highest number
