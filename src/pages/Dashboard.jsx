@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { createPageUrl } from "@/utils";
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import DayCalendarGrid from "@/components/dashboard/calendar/DayCalendarGrid";
+import CalendarSection from "@/components/dashboard/calendar/CalendarSection";
 import TestModal from "@/components/tests/TestModal";
 import InvoiceModal from "@/components/invoices/InvoiceModal";
 
@@ -733,6 +734,20 @@ export default function Dashboard() {
       {/* ============ KPIs TAB ============ */}
       {activeTab === 'kpis' && (
         <>
+          {/* Calendar at top: day/week/month overview */}
+          <CalendarSection
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            tests={tests}
+            technicians={technicians}
+            invoices={invoices}
+            onSlotClick={handleSlotClick}
+            onEditJob={handleEditJob}
+            onCreateInvoice={handleCreateInvoice}
+            onMarkComplete={handleMarkComplete}
+            onDeleteJob={handleDeleteJob}
+          />
+
           {/* Time Period Toggle */}
           <div className="flex justify-end">
             <div className="flex gap-2 clay-button rounded-2xl p-1">
