@@ -24,6 +24,7 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
     number_of_tests: 1,
     status: 'Scheduled',
     scheduled_date: '',
+    duration_minutes: 120,
     technician_id: '',
     technician_name: '',
     lab_id: '',
@@ -55,10 +56,10 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
   const addressInputRef = useRef(null);
   const autocompleteRef = useRef(null);
 
-  // Auto-generate test number for new tests
+  // Auto-generate test number for new tests (prefill objects without id are "new")
   useEffect(() => {
     const generateTestNumber = async () => {
-      if (test) return;
+      if (test?.id) return;
 
       try {
         const allTests = await base44.entities.Test.list();
@@ -296,7 +297,7 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
         <div className="clay-card rounded-3xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-800">
-              {test ? 'Edit Test Profile' : 'New Test Profile'}
+              {test?.id ? 'Edit Test Profile' : 'New Test Profile'}
             </h2>
             <button
               onClick={onClose}
@@ -461,6 +462,21 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
                     onChange={(e) => setFormData({...formData, scheduled_date: e.target.value ? new Date(e.target.value).toISOString() : ''})}
                     className="clay-button rounded-2xl border-0"
                     required
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-700 font-medium mb-2 block">
+                    Duration (minutes)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="15"
+                    step="15"
+                    value={formData.duration_minutes || 120}
+                    onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value) || 120})}
+                    className="clay-button rounded-2xl border-0"
+                    placeholder="120"
                   />
                 </div>
 
@@ -716,7 +732,7 @@ export default function TestModal({ test, clients, technicians, labs, onClose, o
                 className="clay-button rounded-2xl px-6 py-3 font-semibold text-purple-600 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={uploading || saving}
               >
-                {saving ? 'Saving...' : `${test ? 'Update' : 'Create'} Test Profile`}
+                {saving ? 'Saving...' : `${test?.id ? 'Update' : 'Create'} Test Profile`}
               </Button>
             </div>
           </form>
