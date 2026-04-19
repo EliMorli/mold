@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Calendar as CalendarIcon, DollarSign, Briefcase, Inbox } from "lucide-react";
+import { FileText, Search, Calendar as CalendarIcon, DollarSign, Briefcase, Inbox, Plus, Send } from "lucide-react";
 
 const formatDateHeader = (date) => {
   return date.toLocaleDateString("en-US", {
@@ -31,7 +31,7 @@ const isToday = (date) => {
   );
 };
 
-export default function JobsReportTable({ tests, invoices, clients, onUpdateTest }) {
+export default function JobsReportTable({ tests, invoices, clients, onUpdateTest, onCreateInvoice, onSendInvoice }) {
   const [search, setSearch] = useState("");
 
   // Build invoice + client lookup maps
@@ -288,9 +288,63 @@ export default function JobsReportTable({ tests, invoices, clients, onUpdateTest
                               <span className="text-gray-300">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-gray-600 text-sm font-mono">
-                            {invoice?.invoice_number ? (
-                              <span className="text-indigo-600">{invoice.invoice_number}</span>
+                          <TableCell className="text-sm">
+                            {invoice ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={`font-mono ${
+                                    invoice.status === 'Paid'
+                                      ? 'text-emerald-600'
+                                      : invoice.status === 'Overdue'
+                                      ? 'text-red-600'
+                                      : 'text-indigo-600'
+                                  }`}
+                                >
+                                  {invoice.invoice_number}
+                                </span>
+                                {invoice.status === 'Draft' && onSendInvoice && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onSendInvoice(invoice);
+                                    }}
+                                    className="inline-flex items-center gap-1 clay-button rounded-lg px-2 py-0.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:scale-105 transition-transform"
+                                    title="Send invoice (syncs to QuickBooks)"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    Send
+                                  </button>
+                                )}
+                                {invoice.status === 'Sent' && (
+                                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
+                                    Sent
+                                  </Badge>
+                                )}
+                                {invoice.status === 'Paid' && (
+                                  <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
+                                    Paid
+                                  </Badge>
+                                )}
+                                {invoice.status === 'Overdue' && (
+                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
+                                    Overdue
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : onCreateInvoice ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCreateInvoice(test);
+                                }}
+                                className="inline-flex items-center gap-1 clay-button rounded-lg px-2 py-0.5 text-[11px] font-semibold text-gray-500 hover:text-purple-600 hover:scale-105 transition-transform"
+                                title="Create invoice for this job"
+                              >
+                                <Plus className="w-3 h-3" />
+                                Create
+                              </button>
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}

@@ -126,6 +126,15 @@ export default function Dashboard() {
     onError: (e) => toast.error('Failed to create invoice', { description: e.message }),
   });
 
+  const updateInvoiceMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Invoice.update(id, data),
+    onSuccess: (inv) => {
+      queryClient.invalidateQueries(['invoices']);
+      toast.success(`Invoice sent: ${inv?.invoice_number || ''}`);
+    },
+    onError: (e) => toast.error('Failed to send invoice', { description: e.message }),
+  });
+
   const completeTestMutation = useMutation({
     mutationFn: ({ id }) => base44.entities.Test.update(id, { status: 'Completed', completed_date: new Date().toISOString() }),
     onSuccess: () => {
@@ -165,6 +174,22 @@ export default function Dashboard() {
         total: test.cost || 0,
       },
     });
+  };
+
+  const handleSendInvoice = async (invoice) => {
+    try {
+      await updateInvoiceMutation.mutateAsync({
+        id: invoice.id,
+        data: { status: 'Sent' }
+      });
+      await base44.integrations.Core.SendEmail({
+        to: invoice.client_name,
+        subject: `Invoice ${invoice.invoice_number}`,
+        body: `Your invoice for $${invoice.total} is ready. Due date: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}`
+      });
+    } catch (err) {
+      // errors already surfaced via mutation onError
+    }
   };
 
   const handleMarkComplete = (test) => {
@@ -1084,6 +1109,8 @@ export default function Dashboard() {
             invoices={invoices}
             clients={clients}
             onUpdateTest={(id, data) => updateTestMutation.mutate({ id, data })}
+            onCreateInvoice={handleCreateInvoice}
+            onSendInvoice={handleSendInvoice}
           />
         </>
       )}
