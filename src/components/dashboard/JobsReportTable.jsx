@@ -1,9 +1,19 @@
 import { Fragment, useMemo, useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Calendar as CalendarIcon, DollarSign, Briefcase, Inbox, Plus, Send } from "lucide-react";
+import {
+  FileText,
+  Search,
+  Calendar as CalendarIcon,
+  DollarSign,
+  Briefcase,
+  Users,
+  Plus,
+  Send,
+  CheckCircle,
+  Phone,
+  MapPin,
+} from "lucide-react";
 
 const formatDateHeader = (date) => {
   return date.toLocaleDateString("en-US", {
@@ -34,7 +44,6 @@ const isToday = (date) => {
 export default function JobsReportTable({ tests, invoices, clients, onUpdateTest, onCreateInvoice, onSendInvoice }) {
   const [search, setSearch] = useState("");
 
-  // Build invoice + client lookup maps
   const invoiceByTest = useMemo(() => {
     const map = new Map();
     for (const inv of invoices) {
@@ -49,7 +58,6 @@ export default function JobsReportTable({ tests, invoices, clients, onUpdateTest
     return map;
   }, [clients]);
 
-  // Filter + group by date
   const groupedByDate = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = tests.filter((t) => {
@@ -96,322 +104,293 @@ export default function JobsReportTable({ tests, invoices, clients, onUpdateTest
     return { jobCount, grandTotal, dayCount: groupedByDate.length };
   }, [groupedByDate]);
 
-  const toggleField = (test, field) => {
+  const toggleField = (e, test, field) => {
+    e.stopPropagation();
     onUpdateTest?.(test.id, { [field]: !test[field] });
   };
 
-  const COL_COUNT = 11;
-
   return (
-    <div className="clay-card rounded-3xl p-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="clay-button rounded-2xl p-2.5">
-            <FileText className="w-5 h-5 text-purple-500" />
-          </div>
+      <div className="clay-card rounded-3xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-500 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-500 bg-clip-text text-transparent">
               Jobs Report
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Track invoices and report delivery across every job
+            <p className="text-gray-500 mt-1">
+              {totals.jobCount} jobs across {totals.dayCount} days
             </p>
           </div>
-        </div>
-        <div className="relative md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <Input
-            placeholder="Search by company, test #, address, or tech..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="clay-button rounded-xl border-0 h-10 pl-9"
-          />
+          <div className="flex-1 max-w-md relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+            <Input
+              placeholder="Search by company, test #, address, or tech..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-12 clay-button rounded-2xl border-0 h-12 text-gray-700"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Summary chips */}
-      {totals.jobCount > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <div className="clay-button rounded-xl px-3 py-1.5 flex items-center gap-2">
-            <Briefcase className="w-3.5 h-3.5 text-purple-500" />
-            <span className="text-xs text-gray-500">Jobs</span>
-            <span className="text-sm font-bold text-gray-800">{totals.jobCount}</span>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="clay-card rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+              <Briefcase className="w-4 h-4 text-purple-600" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Total Jobs</span>
           </div>
-          <div className="clay-button rounded-xl px-3 py-1.5 flex items-center gap-2">
-            <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-xs text-gray-500">Days</span>
-            <span className="text-sm font-bold text-gray-800">{totals.dayCount}</span>
-          </div>
-          <div className="clay-button rounded-xl px-3 py-1.5 flex items-center gap-2">
-            <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-xs text-gray-500">Total</span>
-            <span className="text-sm font-bold text-emerald-600">
-              ${totals.grandTotal.toLocaleString()}
-            </span>
-          </div>
+          <p className="text-2xl font-bold text-gray-800">{totals.jobCount}</p>
         </div>
-      )}
+        <div className="clay-card rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <CalendarIcon className="w-4 h-4 text-indigo-600" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Days</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{totals.dayCount}</p>
+        </div>
+        <div className="clay-card rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Total Amount</span>
+          </div>
+          <p className="text-2xl font-bold text-emerald-600">${totals.grandTotal.toLocaleString()}</p>
+        </div>
+      </div>
 
       {/* Table */}
-      <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white shadow-sm">
-        <div className="max-h-[70vh] overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
-              <TableRow className="hover:bg-transparent border-b border-gray-200">
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Company</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Sales Rep</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Phone</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Address</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Test Type</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Type &amp; Qty</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide text-right">Amount</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Invoice</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide text-center">Sent</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide text-center">In</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-xs uppercase tracking-wide text-center">Out</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groupedByDate.length === 0 && (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={COL_COUNT} className="py-16">
-                    <div className="flex flex-col items-center justify-center gap-3 text-gray-400">
-                      <div className="clay-button rounded-2xl p-4">
-                        <Inbox className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <p className="text-sm font-medium text-gray-500">
-                        {search ? "No jobs match your search" : "No jobs to display"}
-                      </p>
-                      {search && (
-                        <button
-                          onClick={() => setSearch("")}
-                          className="text-xs text-purple-500 hover:text-purple-600 font-medium"
-                        >
-                          Clear search
-                        </button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
+      <div className="clay-card rounded-3xl p-6 overflow-x-auto">
+        <table className="w-full min-w-[1200px]">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Company</th>
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Sales Rep</th>
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Contact</th>
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Address</th>
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Test Type</th>
+              <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Type & Qty</th>
+              <th className="text-right py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Amount</th>
+              <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Invoice</th>
+              <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Sent</th>
+              <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">In Reports</th>
+              <th className="text-center py-3 px-2 text-xs font-semibold text-gray-500 uppercase">Out Reports</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedByDate.length === 0 && (
+              <tr>
+                <td colSpan={11} className="text-center py-12">
+                  <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-700 mb-2">
+                    {search ? "No jobs match your search" : "No jobs to display"}
+                  </h3>
+                  <p className="text-gray-500">
+                    {search ? (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="text-purple-500 hover:text-purple-600 font-medium"
+                      >
+                        Clear search
+                      </button>
+                    ) : (
+                      "Jobs will appear here once scheduled"
+                    )}
+                  </p>
+                </td>
+              </tr>
+            )}
 
-              {groupedByDate.map(({ key, dateObj, jobs, dailyTotal }) => {
-                const today = isToday(dateObj);
-                return (
-                  <Fragment key={key}>
-                    {/* Date header row */}
-                    <TableRow className="bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 hover:from-amber-50 hover:via-yellow-50 hover:to-amber-50 border-y border-amber-100">
-                      <TableCell colSpan={6} className="py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <CalendarIcon className="w-4 h-4 text-amber-600" />
-                          <span className="font-bold text-gray-800">
-                            {dateObj ? formatDateHeader(dateObj) : "No Scheduled Date"}
-                          </span>
-                          {today && (
-                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5">
-                              Today
-                            </Badge>
-                          )}
-                          <Badge className="bg-white/70 text-gray-600 hover:bg-white/70 border border-amber-200 text-[10px] font-semibold px-2 py-0.5">
-                            {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+            {groupedByDate.map(({ key, dateObj, jobs, dailyTotal }) => {
+              const today = isToday(dateObj);
+              return (
+                <Fragment key={key}>
+                  {/* Date header row */}
+                  <tr className="bg-gradient-to-r from-amber-50 to-yellow-50">
+                    <td colSpan={6} className="py-3 px-2">
+                      <div className="flex items-center gap-3">
+                        <CalendarIcon className="w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-gray-800">
+                          {dateObj ? formatDateHeader(dateObj) : "No Scheduled Date"}
+                        </span>
+                        {today && (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs font-bold px-2">
+                            Today
                           </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-bold text-emerald-600 text-right tabular-nums py-2.5">
+                        )}
+                        <Badge className="bg-white text-gray-600 border border-amber-200 text-xs font-medium px-2">
+                          {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      <span className="font-bold text-emerald-600 text-lg">
                         ${dailyTotal.toLocaleString()}
-                      </TableCell>
-                      <TableCell colSpan={4} />
-                    </TableRow>
+                      </span>
+                    </td>
+                    <td colSpan={4}></td>
+                  </tr>
 
-                    {/* Job rows */}
-                    {jobs.map((test, idx) => {
-                      const invoice = invoiceByTest.get(test.id);
-                      const client = clientById.get(test.client_id);
-                      const phone = test.client_phone || client?.phone || "";
-                      const salesRep = test.sales_rep_name || test.technician_name || "";
-                      const amount = invoice?.total || test.cost || 0;
-                      const zebra = idx % 2 === 1 ? "bg-gray-50/40" : "";
+                  {/* Job rows */}
+                  {jobs.map((test) => {
+                    const invoice = invoiceByTest.get(test.id);
+                    const client = clientById.get(test.client_id);
+                    const phone = test.client_phone || client?.phone || "";
+                    const salesRep = test.sales_rep_name || test.technician_name || "";
+                    const amount = invoice?.total || test.cost || 0;
 
-                      return (
-                        <TableRow
-                          key={test.id}
-                          className={`group transition-colors ${zebra} hover:bg-purple-50/40`}
-                        >
-                          <TableCell className="font-medium text-gray-800">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate max-w-[180px]" title={test.client_name}>
-                                {test.client_name}
-                              </span>
-                              {test.test_number && (
-                                <span className="text-[10px] text-gray-400 font-mono">
-                                  #{test.test_number}
-                                </span>
+                    return (
+                      <tr
+                        key={test.id}
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="py-3 px-2">
+                          <div>
+                            <p className="font-semibold text-gray-800">{test.client_name || "-"}</p>
+                            {test.test_number && (
+                              <p className="text-xs text-gray-400 font-mono">#{test.test_number}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-sm text-gray-600">{salesRep || "-"}</span>
+                        </td>
+                        <td className="py-3 px-2">
+                          <div className="text-sm">
+                            {phone ? (
+                              <p className="flex items-center gap-1 text-gray-600">
+                                <Phone className="w-3 h-3" /> {phone}
+                              </p>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          {test.property_address ? (
+                            <p className="flex items-center gap-1 text-sm text-gray-600 max-w-[200px] truncate" title={test.property_address}>
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{test.property_address}</span>
+                            </p>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          {test.test_type ? (
+                            <Badge className="bg-indigo-100 text-indigo-700 border-0 text-xs font-medium">
+                              {test.test_type}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-sm text-gray-600">
+                            {test.test_category || "-"}
+                            {test.number_of_tests ? ` × ${test.number_of_tests}` : ""}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          <span className="text-sm font-bold text-gray-800">
+                            {amount > 0 ? `$${amount.toLocaleString()}` : "-"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {invoice ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-xs text-gray-600 font-mono">{invoice.invoice_number}</span>
+                              {invoice.status === 'Draft' && onSendInvoice && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSendInvoice(invoice);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                                >
+                                  <Send className="w-3 h-3" /> Send
+                                </button>
+                              )}
+                              {invoice.status === 'Sent' && (
+                                <Badge className="bg-amber-100 text-amber-700 text-xs">Sent</Badge>
+                              )}
+                              {invoice.status === 'Paid' && (
+                                <Badge className="bg-green-100 text-green-700 text-xs">Paid</Badge>
+                              )}
+                              {invoice.status === 'Overdue' && (
+                                <Badge className="bg-red-100 text-red-700 text-xs">Overdue</Badge>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-gray-700 text-sm">{salesRep || <span className="text-gray-300">—</span>}</TableCell>
-                          <TableCell className="text-gray-600 text-sm tabular-nums">
-                            {phone || <span className="text-gray-300">—</span>}
-                          </TableCell>
-                          <TableCell
-                            className="text-gray-700 text-sm max-w-xs truncate"
-                            title={test.property_address}
+                          ) : onCreateInvoice ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCreateInvoice(test);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-purple-600"
+                            >
+                              <Plus className="w-3 h-3" /> Create
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => toggleField(e, test, "invoice_sent")}
+                            className="focus:outline-none"
                           >
-                            {test.property_address || <span className="text-gray-300">—</span>}
-                          </TableCell>
-                          <TableCell>
-                            {test.test_type ? (
-                              <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-0 text-xs font-medium">
-                                {test.test_type}
-                              </Badge>
+                            {test.invoice_sent ? (
+                              <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                             ) : (
-                              <span className="text-gray-300">—</span>
+                              <div className="w-5 h-5 rounded-full border-2 border-gray-300 mx-auto hover:border-green-400 transition-colors" />
                             )}
-                          </TableCell>
-                          <TableCell className="text-gray-700 text-sm">
-                            {test.test_category ? (
-                              <span>
-                                {test.test_category}
-                                {test.number_of_tests ? (
-                                  <span className="text-gray-400 font-mono"> × {test.number_of_tests}</span>
-                                ) : ""}
-                              </span>
+                          </button>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => toggleField(e, test, "in_reports")}
+                            className="focus:outline-none"
+                          >
+                            {test.in_reports ? (
+                              <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                             ) : (
-                              <span className="text-gray-300">—</span>
+                              <div className="w-5 h-5 rounded-full border-2 border-gray-300 mx-auto hover:border-green-400 transition-colors" />
                             )}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-gray-800 tabular-nums">
-                            {amount > 0 ? (
-                              `$${amount.toLocaleString()}`
+                          </button>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => toggleField(e, test, "out_reports")}
+                            className="focus:outline-none"
+                          >
+                            {test.out_reports ? (
+                              <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                             ) : (
-                              <span className="text-gray-300">—</span>
+                              <div className="w-5 h-5 rounded-full border-2 border-gray-300 mx-auto hover:border-green-400 transition-colors" />
                             )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {invoice ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span
-                                  className={`font-mono ${
-                                    invoice.status === 'Paid'
-                                      ? 'text-emerald-600'
-                                      : invoice.status === 'Overdue'
-                                      ? 'text-red-600'
-                                      : 'text-indigo-600'
-                                  }`}
-                                >
-                                  {invoice.invoice_number}
-                                </span>
-                                {invoice.status === 'Draft' && onSendInvoice && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onSendInvoice(invoice);
-                                    }}
-                                    className="inline-flex items-center gap-1 clay-button rounded-lg px-2 py-0.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:scale-105 transition-transform"
-                                    title="Send invoice (syncs to QuickBooks)"
-                                  >
-                                    <Send className="w-3 h-3" />
-                                    Send
-                                  </button>
-                                )}
-                                {invoice.status === 'Sent' && (
-                                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
-                                    Sent
-                                  </Badge>
-                                )}
-                                {invoice.status === 'Paid' && (
-                                  <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
-                                    Paid
-                                  </Badge>
-                                )}
-                                {invoice.status === 'Overdue' && (
-                                  <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-0 text-[10px] uppercase tracking-wide font-bold px-2 py-0.5">
-                                    Overdue
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : onCreateInvoice ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onCreateInvoice(test);
-                                }}
-                                className="inline-flex items-center gap-1 clay-button rounded-lg px-2 py-0.5 text-[11px] font-semibold text-gray-500 hover:text-purple-600 hover:scale-105 transition-transform"
-                                title="Create invoice for this job"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Create
-                              </button>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={!!test.invoice_sent}
-                                onCheckedChange={() => toggleField(test, "invoice_sent")}
-                                className="h-5 w-5 rounded-md data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                                aria-label="Invoice sent"
-                              />
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={!!test.in_reports}
-                                onCheckedChange={() => toggleField(test, "in_reports")}
-                                className="h-5 w-5 rounded-md data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
-                                aria-label="In reports"
-                              />
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={!!test.out_reports}
-                                onCheckedChange={() => toggleField(test, "out_reports")}
-                                className="h-5 w-5 rounded-md data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-                                aria-label="Out reports"
-                              />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
-      {/* Footer summary */}
-      {totals.jobCount > 0 && (
-        <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-          <span>
-            Showing <span className="font-semibold text-gray-700">{totals.jobCount}</span>{" "}
-            {totals.jobCount === 1 ? "job" : "jobs"} across{" "}
-            <span className="font-semibold text-gray-700">{totals.dayCount}</span>{" "}
-            {totals.dayCount === 1 ? "day" : "days"}
-          </span>
-          <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm bg-emerald-500" /> Sent
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm bg-sky-500" /> In
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm bg-purple-500" /> Out
-            </span>
-          </span>
-        </div>
-      )}
     </div>
   );
 }
