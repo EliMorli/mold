@@ -22,14 +22,20 @@ import {
   Hash,
   TestTube,
   Eye,
+  EyeOff,
   Database,
   RotateCcw,
   ArrowDownCircle,
   ArrowUpCircle,
-  Inbox
+  Inbox,
+  Save,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
 import { reloadDemoData } from "@/api/base44Client";
@@ -93,7 +99,32 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
 
-  const hasCreds = QB.hasCredentials();
+  // User settings form state
+  const savedSettings = QB.getUserSettings();
+  const [settingsForm, setSettingsForm] = useState({
+    enabled: savedSettings.enabled,
+    clientId: savedSettings.clientId,
+    clientSecret: savedSettings.clientSecret,
+    realmId: savedSettings.realmId,
+    environment: savedSettings.environment,
+  });
+  const [showClientId, setShowClientId] = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const handleSaveSettings = () => {
+    setSavingSettings(true);
+    try {
+      QB.saveUserConfig(settingsForm);
+      toast.success('QuickBooks settings saved');
+    } catch (e) {
+      toast.error('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const hasCreds = settingsForm.enabled && settingsForm.clientId;
   const hasData = clients.length > 0 || invoices.length > 0 || expenses.length > 0;
   const isEmpty = !isLoading && !hasData;
 
@@ -365,19 +396,19 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-            <DollarSign className="w-6 h-6 text-white" />
+            <Building2 className="w-6 h-6 text-white" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">QuickBooks Integration</h2>
             <p className="text-sm text-gray-500">
               {connectionInfo.isConnected
                 ? `Connected to ${connectionInfo.companyName || 'QuickBooks'}`
-                : 'Connect to sync customers and invoices automatically'}
+                : 'Configure your credentials below to connect'}
             </p>
           </div>
         </div>
 
-        {connectionInfo.isConnected ? (
+        {connectionInfo.isConnected && (
           <div className="flex items-center gap-2">
             <Badge className="bg-green-100 text-green-700 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4" />
@@ -391,58 +422,160 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
               Disconnect
             </Button>
           </div>
-        ) : (
-          <Button
-            onClick={handleConnect}
-            disabled={connecting || !hasCreds}
-            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-4 py-2 flex items-center gap-2 font-semibold disabled:opacity-50"
-          >
-            {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
-            Connect to QuickBooks
-          </Button>
         )}
       </div>
 
-      {/* Setup Warning */}
-      {!hasCreds && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm flex-1">
-              <p className="font-medium text-yellow-800 mb-1">QuickBooks API Credentials Required</p>
-              <p className="text-yellow-700 mb-2">
-                To enable Live Sync, configure these environment variables on your hosting platform (e.g., Vercel):
-              </p>
-              <code className="block bg-yellow-100 p-2 rounded-lg text-xs text-yellow-800 overflow-x-auto">
-                VITE_QUICKBOOKS_CLIENT_ID=...{'\n'}
-                VITE_QUICKBOOKS_REDIRECT_URI={window.location.origin}/Settings?tab=quickbooks{'\n'}
-                VITE_QUICKBOOKS_ENVIRONMENT=sandbox{'\n'}
-                {'\n'}
-                # Server-side only (NOT VITE_ prefix - keeps secret hidden):{'\n'}
-                QUICKBOOKS_CLIENT_ID=...{'\n'}
-                QUICKBOOKS_CLIENT_SECRET=...{'\n'}
-                QUICKBOOKS_REDIRECT_URI={window.location.origin}/Settings?tab=quickbooks
-              </code>
-              <a
-                href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-yellow-800 hover:underline mt-2 font-medium"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Get API credentials from Intuit Developer
-              </a>
-            </div>
+      {/* Settings Form */}
+      <div className="clay-card rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-gray-500" />
+            <h3 className="font-semibold text-gray-800">QuickBooks Settings</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600">Enable Integration</span>
+            <Switch
+              checked={settingsForm.enabled}
+              onCheckedChange={(checked) => setSettingsForm(prev => ({ ...prev, enabled: checked }))}
+            />
           </div>
         </div>
-      )}
+
+        <div className="grid gap-4">
+          {/* Client ID */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1.5 block">Client ID</label>
+            <div className="relative">
+              <Input
+                type={showClientId ? "text" : "password"}
+                value={settingsForm.clientId}
+                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientId: e.target.value }))}
+                placeholder="Your QuickBooks Client ID"
+                className="clay-button rounded-xl border-0 h-11 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowClientId(!showClientId)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showClientId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Client Secret */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1.5 block">Client Secret</label>
+            <div className="relative">
+              <Input
+                type={showClientSecret ? "text" : "password"}
+                value={settingsForm.clientSecret}
+                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientSecret: e.target.value }))}
+                placeholder="Your QuickBooks Client Secret"
+                className="clay-button rounded-xl border-0 h-11 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowClientSecret(!showClientSecret)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showClientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Realm ID */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1.5 block">Realm ID (Company ID)</label>
+            <Input
+              type="text"
+              value={settingsForm.realmId}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, realmId: e.target.value }))}
+              placeholder="QuickBooks Company ID"
+              className="clay-button rounded-xl border-0 h-11"
+            />
+          </div>
+
+          {/* Environment */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1.5 block">Environment</label>
+            <Select
+              value={settingsForm.environment}
+              onValueChange={(value) => setSettingsForm(prev => ({ ...prev, environment: value }))}
+            >
+              <SelectTrigger className="clay-button rounded-xl border-0 h-11">
+                <SelectValue placeholder="Select environment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sandbox">Sandbox</SelectItem>
+                <SelectItem value="production">Production</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <Button
+            onClick={handleSaveSettings}
+            disabled={savingSettings}
+            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-6 py-2.5 flex items-center gap-2 font-semibold"
+          >
+            {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save QuickBooks Settings
+          </Button>
+
+          {settingsForm.enabled && settingsForm.clientId && !connectionInfo.isConnected && (
+            <Button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="clay-button rounded-xl px-5 py-2.5 flex items-center gap-2 font-semibold text-green-600 hover:scale-105"
+            >
+              {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+              Connect
+            </Button>
+          )}
+
+          {settingsForm.enabled && settingsForm.clientId && (
+            <Button
+              onClick={handleTestConnection}
+              disabled={testing || !connectionInfo.isConnected}
+              className="clay-button rounded-xl px-5 py-2.5 flex items-center gap-2 font-medium text-gray-600 hover:scale-105"
+            >
+              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
+              Test
+            </Button>
+          )}
+        </div>
+
+        {/* Connecting status */}
+        {connecting && (
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 rounded-xl px-4 py-2.5">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Opening QuickBooks authorization page...
+          </div>
+        )}
+
+        {/* Get credentials link */}
+        <div className="pt-2 border-t border-gray-100">
+          <a
+            href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-600"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Get API credentials from Intuit Developer Portal
+          </a>
+        </div>
+      </div>
 
       {/* Security Badge */}
-      {hasCreds && (
+      {hasCreds && connectionInfo.isConnected && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-2">
           <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
           <p className="text-xs text-green-700">
-            <strong>Secure:</strong> Token exchange happens server-side. Client secret is never exposed to the browser.
+            <strong>Connected:</strong> Your QuickBooks account is linked. Data syncs securely.
           </p>
         </div>
       )}

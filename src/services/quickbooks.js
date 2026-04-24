@@ -6,10 +6,43 @@
 
 import { base44 } from '@/api/base44Client';
 
+// User-configurable credentials storage keys
+const USER_CONFIG_KEYS = {
+  enabled: 'qb_integration_enabled',
+  clientId: 'qb_user_client_id',
+  clientSecret: 'qb_user_client_secret',
+  userRealmId: 'qb_user_realm_id',
+  environment: 'qb_user_environment',
+};
+
+// Get user-configured settings or fall back to env vars
+function getUserConfig() {
+  return {
+    enabled: localStorage.getItem(USER_CONFIG_KEYS.enabled) === 'true',
+    clientId: localStorage.getItem(USER_CONFIG_KEYS.clientId) || import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || '',
+    clientSecret: localStorage.getItem(USER_CONFIG_KEYS.clientSecret) || '',
+    realmId: localStorage.getItem(USER_CONFIG_KEYS.userRealmId) || '',
+    environment: localStorage.getItem(USER_CONFIG_KEYS.environment) || import.meta.env.VITE_QUICKBOOKS_ENVIRONMENT || 'sandbox',
+  };
+}
+
+export function saveUserConfig(config) {
+  if (config.enabled !== undefined) localStorage.setItem(USER_CONFIG_KEYS.enabled, config.enabled ? 'true' : 'false');
+  if (config.clientId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientId, config.clientId);
+  if (config.clientSecret !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientSecret, config.clientSecret);
+  if (config.realmId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.userRealmId, config.realmId);
+  if (config.environment !== undefined) localStorage.setItem(USER_CONFIG_KEYS.environment, config.environment);
+}
+
+export function getUserSettings() {
+  return getUserConfig();
+}
+
 const QB_CONFIG = {
-  clientId: import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || '',
+  get clientId() { return getUserConfig().clientId; },
+  get clientSecret() { return getUserConfig().clientSecret; },
+  get environment() { return getUserConfig().environment; },
   redirectUri: import.meta.env.VITE_QUICKBOOKS_REDIRECT_URI || `${window.location.origin}/Settings?tab=quickbooks`,
-  environment: import.meta.env.VITE_QUICKBOOKS_ENVIRONMENT || 'sandbox',
   scopes: 'com.intuit.quickbooks.accounting',
 };
 
