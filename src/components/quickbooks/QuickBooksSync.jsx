@@ -99,7 +99,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
 
-  // User settings form state
+  // User settings form
   const savedSettings = QB.getUserSettings();
   const [settingsForm, setSettingsForm] = useState({
     enabled: savedSettings.enabled,
@@ -396,19 +396,19 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-white" />
+            <DollarSign className="w-6 h-6 text-white" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">QuickBooks Integration</h2>
             <p className="text-sm text-gray-500">
               {connectionInfo.isConnected
                 ? `Connected to ${connectionInfo.companyName || 'QuickBooks'}`
-                : 'Configure your credentials below to connect'}
+                : 'Connect to sync customers and invoices automatically'}
             </p>
           </div>
         </div>
 
-        {connectionInfo.isConnected && (
+        {connectionInfo.isConnected ? (
           <div className="flex items-center gap-2">
             <Badge className="bg-green-100 text-green-700 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4" />
@@ -422,6 +422,15 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
               Disconnect
             </Button>
           </div>
+        ) : (
+          <Button
+            onClick={handleConnect}
+            disabled={connecting || !hasCreds}
+            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-4 py-2 flex items-center gap-2 font-semibold disabled:opacity-50"
+          >
+            {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+            Connect to QuickBooks
+          </Button>
         )}
       </div>
 
@@ -575,7 +584,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
         <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-2">
           <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
           <p className="text-xs text-green-700">
-            <strong>Connected:</strong> Your QuickBooks account is linked. Data syncs securely.
+            <strong>Connected:</strong> Your QuickBooks account is linked. Token exchange happens server-side.
           </p>
         </div>
       )}

@@ -18,7 +18,7 @@ const USER_CONFIG_KEYS = {
 // Get user-configured settings or fall back to env vars
 function getUserConfig() {
   return {
-    enabled: localStorage.getItem(USER_CONFIG_KEYS.enabled) === 'true',
+    enabled: localStorage.getItem(USER_CONFIG_KEYS.enabled) !== 'false',
     clientId: localStorage.getItem(USER_CONFIG_KEYS.clientId) || import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || '',
     clientSecret: localStorage.getItem(USER_CONFIG_KEYS.clientSecret) || '',
     realmId: localStorage.getItem(USER_CONFIG_KEYS.userRealmId) || '',
