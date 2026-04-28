@@ -182,6 +182,19 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
     const code = urlParams.get('code');
     const state = urlParams.get('state');
     const realmId = urlParams.get('realmId');
+    const oauthError = urlParams.get('error');
+    const oauthErrorDesc = urlParams.get('error_description');
+
+    // Intuit redirects back with ?error= when the user denies, or when
+    // their OAuth lookup fails after presenting the consent screen.
+    if (oauthError) {
+      const description = oauthErrorDesc ? decodeURIComponent(oauthErrorDesc) : oauthError;
+      toast.error('QuickBooks connection failed', { description });
+      console.error('[QB OAuth]', oauthError, oauthErrorDesc);
+      const cleanUrl = window.location.pathname + '?tab=quickbooks';
+      window.history.replaceState({}, '', cleanUrl);
+      return;
+    }
 
     if (code && state && realmId) {
       (async () => {
@@ -203,10 +216,15 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
     }
   }, []);
 
+  const [connectError, setConnectError] = useState(null);
   const handleConnect = () => {
+    setConnectError(null);
     try {
+      const inspect = QB.inspectAuthorizationRequest();
+      console.info('[QB OAuth] Sending', inspect);
       window.location.href = QB.getAuthorizationUrl();
     } catch (e) {
+      setConnectError(e.message);
       toast.error(e.message);
     }
   };
@@ -462,7 +480,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
               <Input
                 type={showClientId ? "text" : "password"}
                 value={settingsForm.clientId}
-                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientId: e.target.value }))}
+                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientId: e.target.value.trim() }))}
                 placeholder="Your QuickBooks Client ID"
                 className="clay-button rounded-xl border-0 h-11 pr-10"
               />
@@ -483,7 +501,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
               <Input
                 type={showClientSecret ? "text" : "password"}
                 value={settingsForm.clientSecret}
-                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientSecret: e.target.value }))}
+                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientSecret: e.target.value.trim() }))}
                 placeholder="Your QuickBooks Client Secret"
                 className="clay-button rounded-xl border-0 h-11 pr-10"
               />
@@ -503,7 +521,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
             <Input
               type="text"
               value={settingsForm.realmId}
-              onChange={(e) => setSettingsForm(prev => ({ ...prev, realmId: e.target.value }))}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, realmId: e.target.value.trim() }))}
               placeholder="QuickBooks Company ID"
               className="clay-button rounded-xl border-0 h-11"
             />
@@ -568,6 +586,36 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
             Opening QuickBooks authorization page...
           </div>
         )}
+
+        {/* Connect error (validation or OAuth bounce-back) */}
+        {connectError && (
+          <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-4 py-3">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="font-semibold">Cannot connect to QuickBooks</div>
+              <div className="opacity-90">{connectError}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Pre-flight info: shows the user exactly what will be sent so a
+            sandbox/production mismatch or wrong redirect URI is obvious before
+            the user gets stranded on Intuit's "undefined didn't connect" page. */}
+        {settingsForm.enabled && settingsForm.clientId && !connectionInfo.isConnected && (() => {
+          const preflight = QB.inspectAuthorizationRequest();
+          return (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 space-y-1">
+              <div className="font-semibold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Before clicking Connect, verify these match your Intuit app:
+              </div>
+              <div><span className="opacity-70">Environment:</span> <strong>{preflight.environment}</strong> (your Client ID must be from this environment's app)</div>
+              <div><span className="opacity-70">Client ID:</span> <code className="bg-white/60 px-1 rounded">{preflight.clientIdPreview}</code></div>
+              <div><span className="opacity-70">Redirect URI:</span> <code className="bg-white/60 px-1 rounded break-all">{preflight.redirectUri}</code></div>
+              <div className="opacity-70 pt-1">If Intuit shows "undefined didn't connect", the Client ID is usually wrong for this environment, or the Redirect URI doesn't match the one registered at developer.intuit.com.</div>
+            </div>
+          );
+        })()}
 
         {/* Get credentials link */}
         <div className="pt-2 border-t border-gray-100">

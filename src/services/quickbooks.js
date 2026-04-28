@@ -15,23 +15,29 @@ const USER_CONFIG_KEYS = {
   environment: 'qb_user_environment',
 };
 
-// Get user-configured settings or fall back to env vars
+// Get user-configured settings or fall back to env vars.
+// Values are trimmed on read because credentials pasted from Intuit's
+// developer dashboard often carry leading/trailing whitespace, which makes
+// Intuit's OAuth endpoint reject the client_id with a generic
+// "undefined didn't connect" page.
+const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+
 function getUserConfig() {
   return {
     enabled: localStorage.getItem(USER_CONFIG_KEYS.enabled) !== 'false',
-    clientId: localStorage.getItem(USER_CONFIG_KEYS.clientId) || import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || '',
-    clientSecret: localStorage.getItem(USER_CONFIG_KEYS.clientSecret) || '',
-    realmId: localStorage.getItem(USER_CONFIG_KEYS.userRealmId) || '',
-    environment: localStorage.getItem(USER_CONFIG_KEYS.environment) || import.meta.env.VITE_QUICKBOOKS_ENVIRONMENT || 'sandbox',
+    clientId: trim(localStorage.getItem(USER_CONFIG_KEYS.clientId) || import.meta.env.VITE_QUICKBOOKS_CLIENT_ID || ''),
+    clientSecret: trim(localStorage.getItem(USER_CONFIG_KEYS.clientSecret) || ''),
+    realmId: trim(localStorage.getItem(USER_CONFIG_KEYS.userRealmId) || ''),
+    environment: trim(localStorage.getItem(USER_CONFIG_KEYS.environment) || import.meta.env.VITE_QUICKBOOKS_ENVIRONMENT || 'sandbox'),
   };
 }
 
 export function saveUserConfig(config) {
   if (config.enabled !== undefined) localStorage.setItem(USER_CONFIG_KEYS.enabled, config.enabled ? 'true' : 'false');
-  if (config.clientId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientId, config.clientId);
-  if (config.clientSecret !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientSecret, config.clientSecret);
-  if (config.realmId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.userRealmId, config.realmId);
-  if (config.environment !== undefined) localStorage.setItem(USER_CONFIG_KEYS.environment, config.environment);
+  if (config.clientId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientId, trim(config.clientId));
+  if (config.clientSecret !== undefined) localStorage.setItem(USER_CONFIG_KEYS.clientSecret, trim(config.clientSecret));
+  if (config.realmId !== undefined) localStorage.setItem(USER_CONFIG_KEYS.userRealmId, trim(config.realmId));
+  if (config.environment !== undefined) localStorage.setItem(USER_CONFIG_KEYS.environment, trim(config.environment));
 }
 
 export function getUserSettings() {
@@ -73,21 +79,59 @@ export function hasCredentials() {
   return !!QB_CONFIG.clientId;
 }
 
-export function getAuthorizationUrl() {
-  if (!QB_CONFIG.clientId) {
-    throw new Error('QuickBooks Client ID not configured. Add VITE_QUICKBOOKS_CLIENT_ID to your environment.');
+// Intuit client IDs are long opaque tokens. A short or whitespace-laden value
+// is almost always a copy-paste mistake — Intuit's auth endpoint silently
+// rejects these and shows "undefined didn't connect", so we catch it here
+// instead of letting the user discover it on Intuit's site.
+function validateClientId(clientId) {
+  if (!clientId) {
+    throw new Error('QuickBooks Client ID is empty. Paste it from your Intuit developer dashboard, then click Save.');
   }
+  if (clientId !== clientId.trim()) {
+    throw new Error('QuickBooks Client ID has whitespace. Re-paste it without surrounding spaces.');
+  }
+  if (clientId.length < 30) {
+    throw new Error(`QuickBooks Client ID looks too short (${clientId.length} chars). Expected the long token from developer.intuit.com → My App → Keys & OAuth.`);
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(clientId)) {
+    throw new Error('QuickBooks Client ID contains unexpected characters. Re-copy it from the Intuit dashboard.');
+  }
+}
+
+export function getAuthorizationUrl() {
+  validateClientId(QB_CONFIG.clientId);
+
+  const redirectUri = QB_CONFIG.redirectUri;
+  if (!redirectUri || !/^https?:\/\//.test(redirectUri)) {
+    throw new Error(`QuickBooks redirect URI is invalid: "${redirectUri}". Expected an absolute http(s) URL matching the one registered in your Intuit app.`);
+  }
+
   const state = generateRandomState();
   sessionStorage.setItem('qb_oauth_state', state);
 
   const params = new URLSearchParams({
     client_id: QB_CONFIG.clientId,
-    redirect_uri: QB_CONFIG.redirectUri,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: QB_CONFIG.scopes,
     state,
   });
   return `${AUTH_URL}?${params.toString()}`;
+}
+
+/**
+ * Returns a redacted view of the OAuth request that's about to be sent.
+ * Useful for showing the user exactly what will be transmitted so they can
+ * sanity-check it against their Intuit app config before redirecting.
+ */
+export function inspectAuthorizationRequest() {
+  return {
+    clientIdPreview: QB_CONFIG.clientId
+      ? `${QB_CONFIG.clientId.slice(0, 6)}…${QB_CONFIG.clientId.slice(-4)} (${QB_CONFIG.clientId.length} chars)`
+      : '(empty)',
+    redirectUri: QB_CONFIG.redirectUri,
+    environment: QB_CONFIG.environment,
+  };
 }
 
 export async function handleOAuthCallback(code, state, realmId) {
