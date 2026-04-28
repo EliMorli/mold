@@ -178,6 +178,29 @@ const checkDemoVersion = () => {
   }
 };
 
+// Per-entity flag set: keys the user explicitly cleared. We need this because
+// both initializeAllDemoData() and getStoredData() will otherwise re-seed any
+// empty entity on the next load — making "clear data for QB testing" not
+// stick. When a key is in this set, seeding is suppressed for that entity.
+const CLEARED_FLAG_KEY = 'demo_cleared_keys';
+
+const getClearedKeys = () => {
+  try {
+    const raw = localStorage.getItem(CLEARED_FLAG_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const writeClearedKeys = (set) => {
+  try {
+    localStorage.setItem(CLEARED_FLAG_KEY, JSON.stringify([...set]));
+  } catch { /* ignore */ }
+};
+
 // Run version check on load
 if (typeof window !== 'undefined') {
   checkDemoVersion();
@@ -195,8 +218,18 @@ if (typeof window !== 'undefined') {
       users: INITIAL_USERS,
     };
 
+    const cleared = getClearedKeys();
+
     Object.entries(dataToInit).forEach(([key, initialData]) => {
       try {
+        if (cleared.has(key)) {
+          console.log(`[Demo] ${key}: user-cleared, skipping seed`);
+          if (localStorage.getItem(`demo_${key}`) === null) {
+            localStorage.setItem(`demo_${key}`, '[]');
+          }
+          return;
+        }
+
         const stored = localStorage.getItem(`demo_${key}`);
         let needsInit = false;
 
@@ -234,23 +267,33 @@ if (typeof window !== 'undefined') {
 // Helper to get/set data from localStorage with persistence
 const getStoredData = (key, initialData) => {
   try {
+    const userCleared = getClearedKeys().has(key);
     const stored = localStorage.getItem(`demo_${key}`);
+
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Re-init if stored data is null, not an array, OR empty array with available initial data.
-      // This handles edge cases where localStorage has null, a string, or was corrupted.
-      if (!Array.isArray(parsed) || (parsed.length === 0 && initialData.length > 0)) {
-        console.log(`[Demo] ${key}: stored data invalid/empty, re-initializing with ${initialData.length} items`);
+      if (!Array.isArray(parsed)) {
+        // Corrupted: reset to either empty (if user cleared) or seed data.
+        const reset = userCleared ? [] : initialData;
+        localStorage.setItem(`demo_${key}`, JSON.stringify(reset));
+        return reset;
+      }
+      // If user explicitly cleared this entity, return whatever's stored
+      // (including legitimate empty array) without re-seeding.
+      if (userCleared) return parsed;
+      if (parsed.length === 0 && initialData.length > 0) {
+        console.log(`[Demo] ${key}: stored data empty, re-initializing with ${initialData.length} items`);
         localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
         return initialData;
       }
       console.log(`[Demo] ${key}: returning ${parsed.length} stored items`);
       return parsed;
     }
-    // Initialize with default data
-    console.log(`[Demo] ${key}: no stored data, initializing with ${initialData.length} items`);
-    localStorage.setItem(`demo_${key}`, JSON.stringify(initialData));
-    return initialData;
+    // Initialize with default data (or empty if user cleared)
+    const initial = userCleared ? [] : initialData;
+    console.log(`[Demo] ${key}: no stored data, initializing with ${initial.length} items`);
+    localStorage.setItem(`demo_${key}`, JSON.stringify(initial));
+    return initial;
   } catch (e) {
     console.error(`[Demo] ${key} error:`, e);
     // On parse errors, reset the key and return initial data
@@ -262,6 +305,8 @@ const getStoredData = (key, initialData) => {
 // Force re-initialization of all demo data (used by "Reload Demo Data" button in QuickBooks settings)
 export const reloadDemoData = () => {
   try {
+    // Clear the user-cleared flag so seeding takes effect again.
+    writeClearedKeys(new Set());
     Object.keys(INITIAL_DATA_MAP).forEach(key => {
       const initialData = INITIAL_DATA_MAP[key];
       if (initialData && initialData.length > 0) {
@@ -274,6 +319,32 @@ export const reloadDemoData = () => {
     console.error('[Demo] Failed to reload demo data:', e);
     return false;
   }
+};
+
+// Wipe the entities that get pushed to QuickBooks so the user can verify
+// sync end-to-end from a clean slate. The cleared-keys flag persists across
+// reloads so the seed data does not come back.
+const QB_TESTABLE_ENTITIES = ['clients', 'invoices', 'expenses', 'tests', 'leads', 'payments'];
+
+export const clearLocalAppData = (keys = QB_TESTABLE_ENTITIES) => {
+  let total = 0;
+  keys.forEach(k => {
+    try {
+      const stored = localStorage.getItem(`demo_${k}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) total += parsed.length;
+      }
+      localStorage.setItem(`demo_${k}`, '[]');
+    } catch { /* ignore individual key errors */ }
+  });
+  const cleared = getClearedKeys();
+  keys.forEach(k => cleared.add(k));
+  writeClearedKeys(cleared);
+  // Also clear the QB sync log so the activity panel starts fresh.
+  try { localStorage.removeItem('qb_sync_log'); } catch { /* ignore */ }
+  console.log(`[Demo] Cleared ${total} records across ${keys.join(', ')}`);
+  return total;
 };
 
 const saveData = (key, data) => {
