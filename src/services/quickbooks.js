@@ -82,19 +82,21 @@ export function hasCredentials() {
 // Intuit client IDs are long opaque tokens. A short or whitespace-laden value
 // is almost always a copy-paste mistake — Intuit's auth endpoint silently
 // rejects these and shows "undefined didn't connect", so we catch it here
-// instead of letting the user discover it on Intuit's site.
+// instead of letting the user discover it on Intuit's site. We deliberately
+// do NOT enforce a strict character set, because Intuit's Client ID format
+// is not publicly documented and may include characters beyond [A-Za-z0-9].
 function validateClientId(clientId) {
   if (!clientId) {
-    throw new Error('QuickBooks Client ID is empty. Paste it from your Intuit developer dashboard, then click Save.');
+    throw new Error('QuickBooks Client ID is empty. Set VITE_QUICKBOOKS_CLIENT_ID server-side, then redeploy.');
   }
   if (clientId !== clientId.trim()) {
-    throw new Error('QuickBooks Client ID has whitespace. Re-paste it without surrounding spaces.');
+    throw new Error('QuickBooks Client ID has surrounding whitespace. Trim the env var.');
   }
-  if (clientId.length < 30) {
+  if (/\s/.test(clientId)) {
+    throw new Error('QuickBooks Client ID contains internal whitespace. Re-copy it from the Intuit dashboard.');
+  }
+  if (clientId.length < 20) {
     throw new Error(`QuickBooks Client ID looks too short (${clientId.length} chars). Expected the long token from developer.intuit.com → My App → Keys & OAuth.`);
-  }
-  if (!/^[A-Za-z0-9._-]+$/.test(clientId)) {
-    throw new Error('QuickBooks Client ID contains unexpected characters. Re-copy it from the Intuit dashboard.');
   }
 }
 
