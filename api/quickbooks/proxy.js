@@ -37,11 +37,33 @@ export default async function handler(req, res) {
     }
 
     const response = await fetch(url, fetchOptions);
-    const data = await response.json().catch(() => ({}));
+
+    // Capture as text first so non-JSON bodies (HTML gateway errors, plain
+    // text from QB on 5xx) reach the caller verbatim instead of being lost.
+    const raw = await response.text().catch(() => '');
+    let data;
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { _raw: raw.slice(0, 500) };
+    }
+
+    // Forward Retry-After so the client can honor QB's rate-limit hint.
+    // Header value can be either seconds or an HTTP-date.
+    const retryAfter = response.headers.get('retry-after');
+    if (retryAfter) {
+      const seconds = Number(retryAfter);
+      if (Number.isFinite(seconds)) {
+        data._retryAfterMs = Math.max(0, seconds * 1000);
+      } else {
+        const dateMs = Date.parse(retryAfter);
+        if (!Number.isNaN(dateMs)) data._retryAfterMs = Math.max(0, dateMs - Date.now());
+      }
+    }
 
     return res.status(response.status).json(data);
   } catch (error) {
     console.error('QB proxy error:', error);
-    return res.status(500).json({ error: 'Proxy request failed', details: error.message });
+    return res.status(502).json({ error: 'Proxy request failed', details: error.message });
   }
 }

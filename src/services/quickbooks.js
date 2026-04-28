@@ -230,57 +230,115 @@ export async function testConnection() {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function qbRequest(endpoint, options = {}, _attempt = 0) {
-  const MAX_RETRIES = 3;
-  const BACKOFF_MS = [1000, 2000, 4000]; // Exponential backoff
+// Retry policy: caps the total number of attempts and the wall-clock wait
+// between them. We loop instead of recursing so a misbehaving endpoint can
+// never spin forever (a bad refresh-token chain in particular would otherwise
+// be unbounded).
+const MAX_ATTEMPTS = 5;
+const MAX_BACKOFF_MS = 30_000;
+const baseBackoff = (attempt) => Math.min(1000 * 2 ** attempt, MAX_BACKOFF_MS);
+const jittered = (ms) => Math.round(ms * (0.75 + Math.random() * 0.5));
 
-  const accessToken = await getAccessToken();
-  if (!accessToken) throw new Error('Not connected to QuickBooks');
+function buildQbError(parsed, status) {
+  const fault = parsed?.Fault?.Error?.[0];
+  const message =
+    fault?.Message ||
+    parsed?.error_description ||
+    parsed?.error ||
+    parsed?._raw ||
+    `QuickBooks API error (HTTP ${status})`;
+  const err = new Error(fault?.Detail ? `${message} — ${fault.Detail}` : message);
+  err.status = status;
+  err.qbCode = fault?.code;
+  err.qbDetail = fault?.Detail;
+  err.qbType = fault?.type;
+  return err;
+}
 
-  const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
-
-  let response;
+async function readProxyResponse(response) {
+  // The proxy forwards QB's body verbatim, but QB occasionally returns HTML
+  // (gateway pages, 502s); fall back to raw text so we don't lose detail.
+  const text = await response.text().catch(() => '');
+  if (!text) return {};
   try {
-    response = await fetch('/api/quickbooks/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint,
-        method: options.method || 'GET',
-        body: options.body ? JSON.parse(options.body) : undefined,
-        accessToken,
-        realmId,
-        environment: QB_CONFIG.environment,
-      }),
-    });
-  } catch (networkError) {
-    // Network failure (offline, DNS, timeout) - retry with backoff
-    if (_attempt < MAX_RETRIES) {
-      console.warn(`[QB] Network error, retrying in ${BACKOFF_MS[_attempt]}ms...`, networkError.message);
-      await sleep(BACKOFF_MS[_attempt]);
-      return qbRequest(endpoint, options, _attempt + 1);
+    return JSON.parse(text);
+  } catch {
+    return { _raw: text.slice(0, 500) };
+  }
+}
+
+async function qbRequest(endpoint, options = {}) {
+  const realmId = localStorage.getItem(STORAGE_KEYS.realmId);
+  let refreshed = false;
+  let lastError;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) throw new Error('Not connected to QuickBooks');
+
+    let response;
+    try {
+      response = await fetch('/api/quickbooks/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint,
+          method: options.method || 'GET',
+          body: options.body ? JSON.parse(options.body) : undefined,
+          accessToken,
+          realmId,
+          environment: QB_CONFIG.environment,
+        }),
+      });
+    } catch (networkError) {
+      lastError = networkError;
+      if (attempt < MAX_ATTEMPTS - 1) {
+        const wait = jittered(baseBackoff(attempt));
+        console.warn(`[QB] Network error, retrying in ${wait}ms…`, networkError.message);
+        await sleep(wait);
+        continue;
+      }
+      throw new Error(`Network error after ${MAX_ATTEMPTS} attempts: ${networkError.message}`);
     }
-    throw new Error(`Network error after ${MAX_RETRIES} retries: ${networkError.message}`);
+
+    if (response.ok) return response.json();
+
+    const parsed = await readProxyResponse(response);
+
+    // 401: refresh exactly once. If a refreshed token still 401s, the session
+    // is dead — bail out instead of looping.
+    if (response.status === 401) {
+      if (refreshed) throw buildQbError(parsed, 401);
+      refreshed = true;
+      try {
+        await refreshAccessToken();
+      } catch (refreshErr) {
+        throw new Error(`QuickBooks session expired and could not be refreshed: ${refreshErr.message}`);
+      }
+      continue;
+    }
+
+    // Transient: rate-limited or server error. Honor Retry-After when the
+    // proxy forwarded it (parsed._retryAfterMs); otherwise use jittered backoff.
+    if (response.status === 429 || response.status >= 500) {
+      lastError = buildQbError(parsed, response.status);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        const retryAfter = Number(parsed?._retryAfterMs) || 0;
+        const wait = retryAfter > 0
+          ? Math.min(retryAfter, MAX_BACKOFF_MS)
+          : jittered(baseBackoff(attempt));
+        console.warn(`[QB] HTTP ${response.status}, retrying in ${wait}ms…`);
+        await sleep(wait);
+        continue;
+      }
+      throw lastError;
+    }
+
+    // 4xx other than 401/429: not retryable.
+    throw buildQbError(parsed, response.status);
   }
 
-  if (response.status === 401) {
-    await refreshAccessToken();
-    return qbRequest(endpoint, options, 0); // Reset retry count after token refresh
-  }
-
-  // Retry on 5xx server errors or rate limits (429)
-  if ((response.status >= 500 || response.status === 429) && _attempt < MAX_RETRIES) {
-    console.warn(`[QB] Server error ${response.status}, retrying in ${BACKOFF_MS[_attempt]}ms...`);
-    await sleep(BACKOFF_MS[_attempt]);
-    return qbRequest(endpoint, options, _attempt + 1);
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.Fault?.Error?.[0]?.Message || error.error || 'QuickBooks API error');
-  }
-
-  return response.json();
+  throw lastError || new Error('QuickBooks request exhausted retries');
 }
 
 async function fetchAndStoreCompanyInfo() {
@@ -365,6 +423,7 @@ export async function syncCustomersToQB(customers) {
       // Handle QB duplicate name error gracefully - treat as skipped
       if (e.message && /duplicate name/i.test(e.message)) {
         // Try to find the existing customer with a fresh query and link
+        let linked = false;
         try {
           const freshList = await getQBCustomers();
           const existingCust = freshList.find(qc =>
@@ -376,8 +435,17 @@ export async function syncCustomersToQB(customers) {
               qb_id: existingCust.Id,
               qb_sync_token: existingCust.SyncToken
             });
+            linked = true;
           }
-        } catch (_) { /* best effort */ }
+        } catch (recoveryErr) {
+          console.warn('[QB] Duplicate-recovery lookup failed for customer', c.name, recoveryErr);
+          results.errors.push({ name: c.name, error: `Duplicate in QB; could not relink: ${recoveryErr.message}` });
+          continue;
+        }
+        if (!linked) {
+          results.errors.push({ name: c.name, error: 'Duplicate in QB but match not found on relookup' });
+          continue;
+        }
         results.skipped++;
         continue;
       }
@@ -533,6 +601,7 @@ export async function syncInvoicesToQB(invoices) {
       // Treat duplicate-name/docnumber errors as skipped (already exists in QB)
       if (e.message && /duplicate (name|document)|already exists/i.test(e.message)) {
         // Try to find the existing QB invoice and link it
+        let linked = false;
         try {
           const fresh = await getQBInvoices();
           const match = fresh.find(qi => qi.DocNumber === inv.invoice_number);
@@ -541,8 +610,17 @@ export async function syncInvoicesToQB(invoices) {
               qb_id: match.Id,
               qb_sync_token: match.SyncToken,
             });
+            linked = true;
           }
-        } catch (_) { /* best effort */ }
+        } catch (recoveryErr) {
+          console.warn('[QB] Duplicate-recovery lookup failed for invoice', inv.invoice_number, recoveryErr);
+          results.errors.push({ number: inv.invoice_number, error: `Duplicate in QB; could not relink: ${recoveryErr.message}` });
+          continue;
+        }
+        if (!linked) {
+          results.errors.push({ number: inv.invoice_number, error: 'Duplicate in QB but match not found on relookup' });
+          continue;
+        }
         results.skipped++;
         continue;
       }

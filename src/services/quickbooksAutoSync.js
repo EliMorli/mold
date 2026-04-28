@@ -13,6 +13,7 @@ import {
   getQBInvoices,
   getQBExpenses,
 } from './quickbooks';
+import { logSyncEvent } from './qbSyncLog';
 
 const AUTO_SYNC_KEY = 'qb_auto_sync_enabled';
 
@@ -35,16 +36,19 @@ async function syncClientToQB(client) {
     const match = existing.find(c => c.DisplayName?.toLowerCase() === client.name?.toLowerCase());
     if (match) {
       await base44.entities.Client.update(client.id, { qb_id: match.Id, qb_sync_token: match.SyncToken });
+      logSyncEvent({ kind: 'client', status: 'info', message: 'Linked to existing QuickBooks customer', entity: client.name });
       return;
     }
     const created = await createQBCustomer(client);
     if (created?.Id) {
       await base44.entities.Client.update(client.id, { qb_id: created.Id, qb_sync_token: created.SyncToken });
       toast.success('Client synced to QuickBooks', { description: client.name });
+      logSyncEvent({ kind: 'client', status: 'success', message: 'Created in QuickBooks', entity: client.name });
     }
   } catch (e) {
     console.error('[AutoSync] Client sync failed:', e);
     toast.error('Could not sync client to QuickBooks', { description: e.message });
+    logSyncEvent({ kind: 'client', status: 'error', message: e.message, entity: client.name, code: e.qbCode, detail: e.qbDetail });
   }
 }
 
@@ -56,16 +60,19 @@ async function syncInvoiceToQB(invoice) {
     const match = existing.find(i => i.DocNumber === invoice.invoice_number);
     if (match) {
       await base44.entities.Invoice.update(invoice.id, { qb_id: match.Id, qb_sync_token: match.SyncToken });
+      logSyncEvent({ kind: 'invoice', status: 'info', message: 'Linked to existing QuickBooks invoice', entity: invoice.invoice_number });
       return;
     }
     const created = await createQBInvoice(invoice);
     if (created?.Id) {
       await base44.entities.Invoice.update(invoice.id, { qb_id: created.Id, qb_sync_token: created.SyncToken });
       toast.success('Invoice synced to QuickBooks', { description: invoice.invoice_number });
+      logSyncEvent({ kind: 'invoice', status: 'success', message: 'Created in QuickBooks', entity: invoice.invoice_number });
     }
   } catch (e) {
     console.error('[AutoSync] Invoice sync failed:', e);
     toast.error('Could not sync invoice to QuickBooks', { description: e.message });
+    logSyncEvent({ kind: 'invoice', status: 'error', message: e.message, entity: invoice.invoice_number, code: e.qbCode, detail: e.qbDetail });
   }
 }
 
@@ -77,16 +84,19 @@ async function syncExpenseToQB(expense) {
     const match = existing.find(e => e.DocNumber === expense.id);
     if (match) {
       await base44.entities.Expense.update(expense.id, { qb_id: match.Id, qb_sync_token: match.SyncToken });
+      logSyncEvent({ kind: 'expense', status: 'info', message: 'Linked to existing QuickBooks expense', entity: expense.description });
       return;
     }
     const created = await createQBExpense(expense);
     if (created?.Id) {
       await base44.entities.Expense.update(expense.id, { qb_id: created.Id, qb_sync_token: created.SyncToken });
       toast.success('Expense synced to QuickBooks', { description: expense.description });
+      logSyncEvent({ kind: 'expense', status: 'success', message: 'Created in QuickBooks', entity: expense.description });
     }
   } catch (e) {
     console.error('[AutoSync] Expense sync failed:', e);
     toast.error('Could not sync expense to QuickBooks', { description: e.message });
+    logSyncEvent({ kind: 'expense', status: 'error', message: e.message, entity: expense.description, code: e.qbCode, detail: e.qbDetail });
   }
 }
 
