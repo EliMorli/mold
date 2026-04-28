@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
 import { reloadDemoData } from "@/api/base44Client";
 import { isAutoSyncEnabled, setAutoSyncEnabled } from "@/services/quickbooksAutoSync";
+import { getSyncLog, subscribeSyncLog, clearSyncLog } from "@/services/qbSyncLog";
 
 // ---------- IIF/CSV fallback helpers ----------
 const generateIIF = {
@@ -98,6 +99,7 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'export'
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
+  const [syncLog, setSyncLog] = useState(getSyncLog());
 
   // User settings form
   const savedSettings = QB.getUserSettings();
@@ -173,6 +175,8 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
   };
 
   // Handle OAuth callback on mount
+  useEffect(() => subscribeSyncLog(() => setSyncLog(getSyncLog())), []);
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -1074,6 +1078,45 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
                       </div>
                     </details>
                   )}
+                </div>
+              )}
+
+              {syncLog.length > 0 && (
+                <div className="clay-card rounded-2xl p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <Database className="w-5 h-5 text-gray-500" />
+                      Auto-sync Activity
+                    </h3>
+                    <Button
+                      onClick={() => clearSyncLog()}
+                      className="clay-button rounded-lg px-3 py-1 text-xs text-gray-600"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="space-y-1 max-h-64 overflow-y-auto text-xs">
+                    {syncLog.map((entry, i) => {
+                      const tone = entry.status === 'error'
+                        ? 'bg-red-50 text-red-700'
+                        : entry.status === 'success'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-gray-50 text-gray-600';
+                      const time = new Date(entry.timestamp).toLocaleString();
+                      return (
+                        <div key={i} className={`rounded-lg px-3 py-2 ${tone}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium capitalize">{entry.kind}</span>
+                            <span className="text-[10px] opacity-70">{time}</span>
+                          </div>
+                          {entry.entity && <div className="opacity-80">{entry.entity}</div>}
+                          <div>{entry.message}</div>
+                          {entry.detail && <div className="opacity-70 mt-1">{entry.detail}</div>}
+                          {entry.code && <div className="opacity-60 mt-1">QB code: {entry.code}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>
