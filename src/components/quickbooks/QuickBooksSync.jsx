@@ -22,20 +22,15 @@ import {
   Hash,
   TestTube,
   Eye,
-  EyeOff,
   Database,
   RotateCcw,
   ArrowDownCircle,
   ArrowUpCircle,
   Inbox,
-  Save,
   Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
 import { reloadDemoData } from "@/api/base44Client";
@@ -101,32 +96,9 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
   const [syncLog, setSyncLog] = useState(getSyncLog());
 
-  // User settings form
-  const savedSettings = QB.getUserSettings();
-  const [settingsForm, setSettingsForm] = useState({
-    enabled: savedSettings.enabled,
-    clientId: savedSettings.clientId,
-    clientSecret: savedSettings.clientSecret,
-    realmId: savedSettings.realmId,
-    environment: savedSettings.environment,
-  });
-  const [showClientId, setShowClientId] = useState(false);
-  const [showClientSecret, setShowClientSecret] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
-
-  const handleSaveSettings = () => {
-    setSavingSettings(true);
-    try {
-      QB.saveUserConfig(settingsForm);
-      toast.success('QuickBooks settings saved');
-    } catch (e) {
-      toast.error('Failed to save settings');
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
-  const hasCreds = settingsForm.enabled && settingsForm.clientId;
+  // Model A: credentials live in server env vars; clients just click Connect.
+  // hasCreds reflects whether the deployment has been configured by the dev.
+  const hasCreds = QB.hasCredentials();
   const hasData = clients.length > 0 || invoices.length > 0 || expenses.length > 0;
   const isEmpty = !isLoading && !hasData;
 
@@ -182,6 +154,19 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
     const code = urlParams.get('code');
     const state = urlParams.get('state');
     const realmId = urlParams.get('realmId');
+    const oauthError = urlParams.get('error');
+    const oauthErrorDesc = urlParams.get('error_description');
+
+    // Intuit redirects back with ?error= when the user denies, or when
+    // their OAuth lookup fails after presenting the consent screen.
+    if (oauthError) {
+      const description = oauthErrorDesc ? decodeURIComponent(oauthErrorDesc) : oauthError;
+      toast.error('QuickBooks connection failed', { description });
+      console.error('[QB OAuth]', oauthError, oauthErrorDesc);
+      const cleanUrl = window.location.pathname + '?tab=quickbooks';
+      window.history.replaceState({}, '', cleanUrl);
+      return;
+    }
 
     if (code && state && realmId) {
       (async () => {
@@ -203,10 +188,15 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
     }
   }, []);
 
+  const [connectError, setConnectError] = useState(null);
   const handleConnect = () => {
+    setConnectError(null);
     try {
+      const inspect = QB.inspectAuthorizationRequest();
+      console.info('[QB OAuth] Sending', inspect);
       window.location.href = QB.getAuthorizationUrl();
     } catch (e) {
+      setConnectError(e.message);
       toast.error(e.message);
     }
   };
@@ -438,128 +428,77 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
         )}
       </div>
 
-      {/* Settings Form */}
+      {/* QuickBooks connection card — Model A: credentials are configured by
+          the site admin via env vars; the user just clicks Connect to link
+          their QuickBooks account via OAuth. */}
       <div className="clay-card rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-800">QuickBooks Settings</h3>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Enable Integration</span>
-            <Switch
-              checked={settingsForm.enabled}
-              onCheckedChange={(checked) => setSettingsForm(prev => ({ ...prev, enabled: checked }))}
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <Settings className="w-5 h-5 text-gray-500" />
+          <h3 className="font-semibold text-gray-800">QuickBooks Connection</h3>
         </div>
 
-        <div className="grid gap-4">
-          {/* Client ID */}
-          <div>
-            <label className="text-sm text-gray-600 mb-1.5 block">Client ID</label>
-            <div className="relative">
-              <Input
-                type={showClientId ? "text" : "password"}
-                value={settingsForm.clientId}
-                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientId: e.target.value }))}
-                placeholder="Your QuickBooks Client ID"
-                className="clay-button rounded-xl border-0 h-11 pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowClientId(!showClientId)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        {!hasCreds ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
+            <div className="font-semibold flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />
+              QuickBooks integration is not configured yet
+            </div>
+            <p className="opacity-80 mt-1">
+              The site administrator needs to set <code>QUICKBOOKS_CLIENT_ID</code>,{' '}
+              <code>QUICKBOOKS_CLIENT_SECRET</code>, and <code>QUICKBOOKS_REDIRECT_URI</code> server-side,
+              plus <code>VITE_QUICKBOOKS_CLIENT_ID</code> and <code>VITE_QUICKBOOKS_REDIRECT_URI</code> for the
+              browser. Once those are set and the app is redeployed, the Connect button below will become
+              available.
+            </p>
+            <a
+              href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs underline mt-2"
+            >
+              <ExternalLink className="w-3 h-3" />
+              How to get Intuit credentials
+            </a>
+          </div>
+        ) : !connectionInfo.isConnected ? (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Click <strong>Connect</strong> to authorize this app to read and write your QuickBooks data.
+              You will be redirected to Intuit to log in and choose your company. No credentials are stored
+              in this browser — token exchange happens server-side.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={handleConnect}
+                disabled={connecting}
+                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-5 py-2.5 flex items-center gap-2 font-semibold disabled:opacity-50"
               >
-                {showClientId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+                Connect to QuickBooks
+              </Button>
             </div>
           </div>
-
-          {/* Client Secret */}
-          <div>
-            <label className="text-sm text-gray-600 mb-1.5 block">Client Secret</label>
-            <div className="relative">
-              <Input
-                type={showClientSecret ? "text" : "password"}
-                value={settingsForm.clientSecret}
-                onChange={(e) => setSettingsForm(prev => ({ ...prev, clientSecret: e.target.value }))}
-                placeholder="Your QuickBooks Client Secret"
-                className="clay-button rounded-xl border-0 h-11 pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowClientSecret(!showClientSecret)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        ) : (
+          <div className="space-y-3">
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="font-semibold">Connected to {connectionInfo.companyName || 'QuickBooks'}</div>
+                <div className="opacity-80">You can disconnect at any time from the button at the top of this page.</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="clay-button rounded-xl px-5 py-2.5 flex items-center gap-2 font-medium text-gray-600 hover:scale-105"
               >
-                {showClientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
+                Test Connection
+              </Button>
             </div>
           </div>
-
-          {/* Realm ID */}
-          <div>
-            <label className="text-sm text-gray-600 mb-1.5 block">Realm ID (Company ID)</label>
-            <Input
-              type="text"
-              value={settingsForm.realmId}
-              onChange={(e) => setSettingsForm(prev => ({ ...prev, realmId: e.target.value }))}
-              placeholder="QuickBooks Company ID"
-              className="clay-button rounded-xl border-0 h-11"
-            />
-          </div>
-
-          {/* Environment */}
-          <div>
-            <label className="text-sm text-gray-600 mb-1.5 block">Environment</label>
-            <Select
-              value={settingsForm.environment}
-              onValueChange={(value) => setSettingsForm(prev => ({ ...prev, environment: value }))}
-            >
-              <SelectTrigger className="clay-button rounded-xl border-0 h-11">
-                <SelectValue placeholder="Select environment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sandbox">Sandbox</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <Button
-            onClick={handleSaveSettings}
-            disabled={savingSettings}
-            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl px-6 py-2.5 flex items-center gap-2 font-semibold"
-          >
-            {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save QuickBooks Settings
-          </Button>
-
-          {settingsForm.enabled && settingsForm.clientId && !connectionInfo.isConnected && (
-            <Button
-              onClick={handleConnect}
-              disabled={connecting}
-              className="clay-button rounded-xl px-5 py-2.5 flex items-center gap-2 font-semibold text-green-600 hover:scale-105"
-            >
-              {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
-              Connect
-            </Button>
-          )}
-
-          {settingsForm.enabled && settingsForm.clientId && (
-            <Button
-              onClick={handleTestConnection}
-              disabled={testing || !connectionInfo.isConnected}
-              className="clay-button rounded-xl px-5 py-2.5 flex items-center gap-2 font-medium text-gray-600 hover:scale-105"
-            >
-              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
-              Test
-            </Button>
-          )}
-        </div>
+        )}
 
         {/* Connecting status */}
         {connecting && (
@@ -569,18 +508,47 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
           </div>
         )}
 
-        {/* Get credentials link */}
-        <div className="pt-2 border-t border-gray-100">
-          <a
-            href="https://developer.intuit.com/app/developer/qbo/docs/get-started"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-600"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Get API credentials from Intuit Developer Portal
-          </a>
-        </div>
+        {/* Connect error (validation or OAuth bounce-back) */}
+        {connectError && (
+          <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-4 py-3">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="font-semibold">Cannot connect to QuickBooks</div>
+              <div className="opacity-90">{connectError}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Test result */}
+        {testResult && (
+          <div className={`rounded-xl px-4 py-3 text-sm ${testResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            {testResult.success
+              ? `OK — connected to ${testResult.info?.CompanyName || 'QuickBooks'}`
+              : `Failed: ${testResult.error}`}
+          </div>
+        )}
+
+        {/* Diagnostics — collapsed by default. Shows the dev exactly what's
+            configured so a sandbox/prod mismatch or wrong redirect URI is
+            obvious without surfacing it to end users. */}
+        {hasCreds && (() => {
+          const preflight = QB.inspectAuthorizationRequest();
+          return (
+            <details className="text-xs text-gray-500">
+              <summary className="cursor-pointer font-medium hover:text-gray-700">
+                Diagnostics — current configuration
+              </summary>
+              <div className="mt-2 space-y-1 bg-gray-50 rounded-xl p-3">
+                <div><span className="opacity-70">Environment:</span> <strong>{preflight.environment}</strong></div>
+                <div><span className="opacity-70">Client ID:</span> <code className="bg-white px-1 rounded">{preflight.clientIdPreview}</code></div>
+                <div><span className="opacity-70">Redirect URI:</span> <code className="bg-white px-1 rounded break-all">{preflight.redirectUri}</code></div>
+                <div className="opacity-70 pt-2">
+                  The Redirect URI must match exactly the one registered at developer.intuit.com → My App → Keys &amp; OAuth → Redirect URIs.
+                </div>
+              </div>
+            </details>
+          );
+        })()}
       </div>
 
       {/* Security Badge */}
