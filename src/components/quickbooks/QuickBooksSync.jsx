@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import * as QB from "@/services/quickbooks";
-import { reloadDemoData } from "@/api/base44Client";
+import { reloadDemoData, clearLocalAppData } from "@/api/base44Client";
 import { isAutoSyncEnabled, setAutoSyncEnabled } from "@/services/quickbooksAutoSync";
 import { getSyncLog, subscribeSyncLog, clearSyncLog } from "@/services/qbSyncLog";
 
@@ -141,6 +141,37 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
       toast.success('Demo data reloaded successfully');
     } catch (e) {
       toast.error('Reload failed: ' + e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Clear all clients, invoices, expenses, tests, leads, and payments so the
+  // user can connect to QuickBooks and verify a sync end-to-end from a clean
+  // slate. The cleared state persists across reloads (won't be re-seeded).
+  const handleClearForQBTest = async () => {
+    const message =
+      `This will delete all clients, invoices, expenses, tests, leads, and payments from this browser ` +
+      `so you can verify QuickBooks sync from an empty state.\n\n` +
+      `Your QuickBooks data is NOT touched. Technicians, labs, and users are kept.\n\n` +
+      `Continue?`;
+    if (!window.confirm(message)) return;
+    setRefreshing(true);
+    try {
+      const total = clearLocalAppData();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['clients'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+        queryClient.invalidateQueries({ queryKey: ['tests'] }),
+        queryClient.invalidateQueries({ queryKey: ['leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['expenses'] }),
+      ]);
+      setSyncLog([]);
+      setSyncResults(null);
+      setImportResults(null);
+      toast.success(`Cleared ${total} local records — clean slate for QuickBooks testing`);
+    } catch (e) {
+      toast.error('Clear failed: ' + e.message);
     } finally {
       setRefreshing(false);
     }
@@ -544,6 +575,32 @@ export default function QuickBooksSync({ clients = [], invoices = [], expenses =
                 <div><span className="opacity-70">Redirect URI:</span> <code className="bg-white px-1 rounded break-all">{preflight.redirectUri}</code></div>
                 <div className="opacity-70 pt-2">
                   The Redirect URI must match exactly the one registered at developer.intuit.com → My App → Keys &amp; OAuth → Redirect URIs.
+                </div>
+
+                <div className="border-t border-gray-200 mt-3 pt-3 space-y-2">
+                  <div className="font-medium text-gray-700">Test utilities</div>
+                  <p className="opacity-70">
+                    Wipe local clients, invoices, expenses, tests, leads, and payments so you can connect to QuickBooks
+                    and watch a single record sync from end to end. Your QuickBooks data is not touched.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      onClick={handleClearForQBTest}
+                      disabled={refreshing}
+                      className="clay-button rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-red-600 text-xs disabled:opacity-50"
+                    >
+                      {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                      Clear local data for QB testing
+                    </Button>
+                    <Button
+                      onClick={handleReloadDemoData}
+                      disabled={refreshing}
+                      className="clay-button rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-amber-700 text-xs disabled:opacity-50"
+                    >
+                      {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                      Restore demo data
+                    </Button>
+                  </div>
                 </div>
               </div>
             </details>
