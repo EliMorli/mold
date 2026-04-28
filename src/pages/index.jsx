@@ -56,6 +56,15 @@ import Users from "./Users";
 
 import Verify from "./Verify";
 
+import SignUp from "./auth/SignUp";
+import Login from "./auth/Login";
+import ForgotPassword from "./auth/ForgotPassword";
+import ResetPassword from "./auth/ResetPassword";
+import CheckEmail from "./auth/CheckEmail";
+import AuthCallback from "./auth/Callback";
+import Onboarding from "./onboarding/Onboarding";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -204,10 +213,36 @@ export default function Pages() {
     return (
         <Router>
             <Routes>
+                {/* Public auth pages — no layout, no auth gate */}
+                <Route path="/auth/signup" element={<SignUp />} />
+                <Route path="/auth/login" element={<Login />} />
+                <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                <Route path="/auth/reset-password" element={<ResetPassword />} />
+                <Route path="/auth/check-email" element={<CheckEmail />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+
+                {/* Authenticated but pre-org */}
+                <Route
+                    path="/onboarding"
+                    element={
+                        <ProtectedRoute requireOrg={false}>
+                            <Onboarding />
+                        </ProtectedRoute>
+                    }
+                />
+
                 {/* Verify page without layout */}
                 <Route path="/verify" element={<Verify />} />
-                {/* All other pages with layout */}
-                <Route path="/*" element={<PagesContent />} />
+
+                {/* All other pages with layout — gated on auth + org */}
+                <Route
+                    path="/*"
+                    element={
+                        <ProtectedRoute>
+                            <PagesContent />
+                        </ProtectedRoute>
+                    }
+                />
             </Routes>
         </Router>
     );
