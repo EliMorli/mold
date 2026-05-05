@@ -67,7 +67,6 @@ export function AuthProvider({ children }) {
     memberships,
     loading,
     isAuthenticated: Boolean(session?.user),
-    isEmailVerified: Boolean(session?.user?.email_confirmed_at),
     hasOrg: memberships.length > 0,
     primaryOrg: memberships[0]?.org || null,
     primaryRole: memberships[0]?.role || null,
