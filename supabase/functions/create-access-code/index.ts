@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     org_id,
     role,
     display_name,
-    code_prefix: code.slice(0, 4),
+    code_prefix: code.slice(0, 3),
     created_by: callerId,
   });
   if (acErr) {
