@@ -49,6 +49,20 @@ begin
 
   -- profiles row is created by the on_auth_user_created trigger.
 
+  -- GoTrue requires an auth.identities row with provider='email' for password
+  -- login to work; without this every signin returns invalid_credentials.
+  insert into auth.identities (
+    user_id, provider_id, identity_data, provider,
+    last_sign_in_at, created_at, updated_at
+  )
+  values (
+    v_user_id,
+    v_user_id::text,
+    jsonb_build_object('sub', v_user_id::text, 'email', v_email),
+    'email',
+    now(), now(), now()
+  );
+
   insert into public.orgs (name, created_by)
   values (v_org_name, v_user_id)
   returning id into v_org_id;
