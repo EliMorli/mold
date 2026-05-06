@@ -46,8 +46,10 @@ export default function Login() {
       toast.error('Invalid access code');
       return;
     }
-    // Best-effort touch — don't block login if it fails.
-    supabase.rpc('touch_access_code').catch(() => {});
+    // Best-effort touch — don't block login if it fails. supabase.rpc()
+    // returns a thenable (not a real Promise), so use .then(_, onError)
+    // rather than .catch(), which isn't defined on the builder.
+    supabase.rpc('touch_access_code').then(() => {}, () => {});
     setSubmitting(false);
     const next = new URLSearchParams(location.search).get('next') || '/dashboard';
     navigate(next);
