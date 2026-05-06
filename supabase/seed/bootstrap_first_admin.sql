@@ -39,7 +39,7 @@ begin
     'authenticated',
     'authenticated',
     v_email,
-    crypt(v_code, gen_salt('bf')),
+    crypt(v_code, gen_salt('bf', 10)),
     now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', v_display_name),
